@@ -5,12 +5,13 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: secrets.AZURE_CREDENTIALS != ''
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/login@v2
+      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        uses: azure/login@v2
         with: { creds: '${{ secrets.AZURE_CREDENTIALS }}' }
-      - name: Provision Azure Container Apps (idempotent)
+      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        name: Provision Azure Container Apps (idempotent)
         run: |
           set -euo pipefail
           RG="${{ vars.AZURE_RG }}"; LOC="${AZURE_LOC:-${{ vars.AZURE_LOC }}}"
@@ -20,12 +21,14 @@ jobs:
           LAWS=$(az monitor log-analytics workspace show -g "$RG" -n "${ACA_ENV}-logs" --query id -o tsv 2>/dev/null \
                  || az monitor log-analytics workspace create -g "$RG" -n "${ACA_ENV}-logs" -l "$LOC" --query id -o tsv)
           az containerapp env create --name "$ACA_ENV" --resource-group "$RG" --location "$LOC" --logs-workspace-id "$LAWS" --output none 2>/dev/null || true
-      - name: Build and push middleware to ACR
+      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        name: Build and push middleware to ACR
         run: |
           az acr login --name "${{ vars.AZURE_ACR }}"
           docker build -t "${{ vars.AZURE_ACR }}.azurecr.io/sga-middleware:${GITHUB_SHA::8}" apps/middleware
           docker push "${{ vars.AZURE_ACR }}.azurecr.io/sga-middleware:${GITHUB_SHA::8}"
-      - name: Deploy container app
+      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        name: Deploy container app
         run: |
           APP="--name ${{ vars.AZURE_APP }} --resource-group ${{ vars.AZURE_RG }} --environment ${{ vars.AZURE_ENV }}"
           az containerapp create --image "${{ vars.AZURE_ACR }}.azurecr.io/sga-middleware:${GITHUB_SHA::8}" \
@@ -33,7 +36,8 @@ jobs:
             --env-vars PLANE_URL="${PLANE_URL:-http://plane-proxy:80}" FLOWABLE_URL="${FLOWABLE_URL:-http://flowable:8080}" \
             $APP --output none 2>/dev/null \
           || az containerapp update --image "${{ vars.AZURE_ACR }}.azurecr.io/sga-middleware:${GITHUB_SHA::8}" $APP --output none
-      - name: Smoke test
+      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        name: Smoke test
         run: |
           FQDN=$(az containerapp show -n "${{ vars.AZURE_APP }}" -g "${{ vars.AZURE_RG }}" --query properties.configuration.ingress.fqdn -o tsv)
           echo "APP_FQDN=$FQDN"
