@@ -1,0 +1,9 @@
+{
+  "name": "sga-demo-middleware",
+  "version": "1.0.0",
+  "description": "Thin glue: Plane webhook receiver, Flowable client, write-back, mocks, REST ingestion simulator for the SGA demo stand",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": { "start": "node src/index.js" },
+  "engines": { "node": ">=18" }
+}

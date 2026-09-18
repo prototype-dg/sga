@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cmmn:definitions xmlns:cmmn="http://www.omg.org/spec/CMMN/20151109/MODEL"
+                  xmlns:cmmndi="http://www.omg.org/spec/CMMN/20151109/CMMNDI"
+                  xmlns:flowable="http://flowable.org/cmmn"
+                  targetNamespace="http://demo.andersen/sga">
+  <cmmn:case id="OCP_case" name="OCP — Octroi de Crédit (case)">
+    <cmmn:casePlanModel id="ocpPlanModel" name="Dossier de crédit">
+      <cmmn:planItemDefinition id="inputPD" name="Reçu en agence">
+        <cmmn:caseTask name="Reçu en agence"/>
+      </cmmn:planItemDefinition>
+      <cmmn:planItemDefinition id="studyPD" name="Demande en étude">
+        <cmmn:humanTask name="Demande en étude" flowable:assignee="${initiator}"/>
+      </cmmn:planItemDefinition>
+      <cmmn:planItemDefinition id="axaPD" name="Attente AXA">
+        <cmmn:stage name="Attente AXA / Questionnaire médical">
+          <cmmn:planItemDefinition id="axaQPD" name="Questionnaire médical AXA">
+            <cmmn:humanTask name="Questionnaire médical AXA" flowable:assignee="${axaUser}"/>
+          </cmmn:planItemDefinition>
+          <cmmn:planItemDefinition id="axaRPD" name="Retour AXA">
+            <cmmn:humanTask name="Retour AXA" flowable:assignee="${initiator}"/>
+          </cmmn:planItemDefinition>
+        </cmmn:stage>
+      </cmmn:planItemDefinition>
+      <cmmn:planItemDefinition id="decisionPD" name="Décision">
+        <cmmn:humanTask name="Décision / Comité d'engagement" flowable:assignee="${comiteUser}"/>
+      </cmmn:planItemDefinition>
+      <cmmn:planItemDefinition id="issuancePD" name="Éxécution">
+        <cmmn:humanTask name="Éxécution / Validation finale" flowable:assignee="${execUser}"/>
+      </cmmn:planItemDefinition>
+      <cmmn:planItemDefinition id="milestoneDone" name="EXÉCUTÉ AVEC SUCCÈS">
+        <cmmn:milestone name="EXÉCUTÉ AVEC SUCCÈS"/>
+      </cmmn:planItemDefinition>
+
+      <cmmn:planItem id="inputPI" definitionRef="inputPD"/>
+      <cmmn:planItem id="studyPI" definitionRef="studyPD"/>
+      <cmmn:planItem id="axaPI" definitionRef="axaPD"/>
+      <cmmn:planItem id="axaQPI" definitionRef="axaQPD"/>
+      <cmmn:planItem id="axaRPI" definitionRef="axaRPD"/>
+      <cmmn:planItem id="decisionPI" definitionRef="decisionPD"/>
+      <cmmn:planItem id="issuancePI" definitionRef="issuancePD"/>
+      <cmmn:planItem id="donePI" definitionRef="milestoneDone"/>
+
+      <cmmn:caseFileModel id="ocpFile">
+        <cmmn:caseFileItemDefinition id="dossierDef" name="dossier" structureRef="http://www.omg.org/spec/CMMN/20151109/Model/StandardDefinitions"/>
+        <cmmn:caseFileItem id="dossierItem" definitionRef="dossierDef" name="dossier"/>
+      </cmmn:caseFileModel>
+
+      <cmmn:sentry id="s_afterInput" name="après saisie">
+        <cmmn:onPart id="op_input" name="on input"><cmmn:planItemOnPart id="pip_input" sourceRef="inputPI"><cmmn:standardEvent>complete</cmmn:standardEvent></cmmn:planItemOnPart></cmmn:onPart>
+      </cmmn:sentry>
+      <cmmn:sentry id="s_afterStudy" name="après étude">
+        <cmmn:onPart id="op_study" name="on study"><cmmn:planItemOnPart id="pip_study" sourceRef="studyPI"><cmmn:standardEvent>complete</cmmn:standardEvent></cmmn:planItemOnPart></cmmn:onPart>
+      </cmmn:sentry>
+      <cmmn:sentry id="s_axaReady" name="AXA lue">
+        <cmmn:onPart id="op_axa" name="on axa"><cmmn:planItemOnPart id="pip_axa" sourceRef="axaRPI"><cmmn:standardEvent>complete</cmmn:standardEvent></cmmn:planItemOnPart></cmmn:onPart>
+      </cmmn:sentry>
+      <cmmn:sentry id="s_afterDecision" name="après décision">
+        <cmmn:onPart id="op_dec" name="on decision"><cmmn:planItemOnPart id="pip_dec" sourceRef="decisionPI"><cmmn:standardEvent>complete</cmmn:standardEvent></cmmn:planItemOnPart></cmmn:onPart>
+      </cmmn:sentry>
+      <cmmn:sentry id="s_done" name="tout fini">
+        <cmmn:onPart id="op_iss" name="on issuance"><cmmn:planItemOnPart id="pip_iss" sourceRef="issuancePI"><cmmn:standardEvent>complete</cmmn:standardEvent></cmmn:planItemOnPart></cmmn:onPart>
+      </cmmn:sentry>
+
+      <cmmn:exitCriterion id="exitDone" sentryRef="s_done"/>
+    </cmmn:casePlanModel>
+  </cmmn:case>
+</cmmn:definitions>

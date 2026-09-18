@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/DMN/20191111/MODEL" id="scoring" name="Scoring crédit"
+             namespace="http://demo.andersen/sga">
+  <decision id="creditLevel" name="Niveau d'étude selon montant">
+    <decisionTable id="dt_creditLevel" hitPolicy="UNIQUE">
+      <input id="i_montant" label="montant">
+        <inputExpression typeRef="number"><text>montant</text></inputExpression>
+      </input>
+      <input id="i_garanties" label="garanties">
+        <inputExpression typeRef="string"><text>garanties</text></inputExpression>
+      </input>
+      <output id="o_niveau" label="niveau" typeRef="string"/>
+      <output id="o_comite" label="comite" typeRef="boolean"/>
+      <rule id="r1">
+        <inputEntry id="r1i1"><text>&lt; 1000000</text></inputEntry>
+        <inputEntry id="r1i2"><text>-</text></inputEntry>
+        <outputEntry id="r1o1"><text>"BACK-OFFICE"</text></outputEntry>
+        <outputEntry id="r1o2"><text>false</text></outputEntry>
+      </rule>
+      <rule id="r2">
+        <inputEntry id="r2i1"><text>[1000000..5000000)</text></inputEntry>
+        <inputEntry id="r2i2"><text>-</text></inputEntry>
+        <outputEntry id="r2o1"><text>"COMITE"</text></outputEntry>
+        <outputEntry id="r2o2"><text>true</text></outputEntry>
+      </rule>
+      <rule id="r3">
+        <inputEntry id="r3i1"><text>&gt;= 5000000</text></inputEntry>
+        <inputEntry id="r3i2"><text>-</text></inputEntry>
+        <outputEntry id="r3o1"><text>"DIRECTION"</text></outputEntry>
+        <outputEntry id="r3o2"><text>true</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

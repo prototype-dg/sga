@@ -1,0 +1,85 @@
+# SGA Demo Stand — local full stack (docker compose up -d)
+# Plane CE + Flowable REST + middleware (mocks inside middleware)
+# Env: copy .env.example -> .env, adjust tags/secrets.
+version: "3.9"
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment: [ POSTGRES_USER: plane, POSTGRES_PASSWORD: plane, POSTGRES_DB: plane ]
+    volumes: [ "postgres_data:/var/lib/postgresql/data" ]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U plane"], interval: 10s, timeout: 5s, retries: 5 }
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes: [ "redis_data:/data" ]
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment: [ MINIO_ROOT_USER: plane, MINIO_ROOT_PASSWORD: plane12345 ]
+    volumes: [ "minio_data:/data" ]
+  createbuckets:
+    image: minio/mc:latest
+    depends_on: [ minio ]
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set m http://minio:9000 plane plane12345; do sleep 2; done;
+      mc mb --ignore-existing m/planestorage || true;
+      mc anonymous set download m/planestorage || true;
+      exit 0;"
+  plane-migrator:
+    image: ${PLANE_IMAGE:-ghcr.io/makeplane/plane:stable}
+    restart: "no"
+    command: python manage.py migrate
+    env_file: [ plane/plane.env ]
+    depends_on: [ postgres, redis ]
+  plane-web:
+    image: ${PLANE_IMAGE:-ghcr.io/makeplane/plane:stable}
+    restart: unless-stopped
+    command: python manage.py runserver 0.0.0.0:3002
+    env_file: [ plane/plane.env ]
+    depends_on: [ plane-migrator ]
+  plane-api:
+    image: ${PLANE_IMAGE:-ghcr.io/makeplane/plane:stable}
+    restart: unless-stopped
+    command: python manage.py runserver 0.0.0.0:8000
+    env_file: [ plane/plane.env ]
+    depends_on: [ plane-migrator ]
+  plane-worker:
+    image: ${PLANE_IMAGE:-ghcr.io/makeplane/plane:stable}
+    restart: unless-stopped
+    command: python manage.py celery_worker
+    env_file: [ plane/plane.env ]
+    depends_on: [ plane-migrator ]
+  plane-proxy:
+    image: ${PLANE_IMAGE:-ghcr.io/makeplane/plane:stable}
+    restart: unless-stopped
+    command: python manage.py proxy
+    env_file: [ plane/plane.env ]
+    depends_on: [ plane-web, plane-api ]
+    ports: [ "8080:80" ]
+  flowable:
+    image: flowable/flowable-rest:latest
+    restart: unless-stopped
+    environment: [ SPRING_PROFILES_ACTIVE: "dev", flowable.rest.app.authentication-mode: "basic" ]
+    ports: [ "8081:8080" ]
+  middleware:
+    build: ./apps/middleware
+    restart: unless-stopped
+    environment:
+      PLANE_URL: "http://plane-proxy:80"
+      PLANE_ADMIN_TOKEN: ${PLANE_ADMIN_TOKEN:-}
+      PLANE_WORKSPACE: ${PLANE_WORKSPACE:-sga}
+      PLANE_CREDIT_PROJECT: ${PLANE_CREDIT_PROJECT:-}
+      PLANE_RFC_PROJECT: ${PLANE_RFC_PROJECT:-}
+      PLANE_WEBHOOK_SECRET: ${PLANE_WEBHOOK_SECRET:-demo-secret-change-me}
+      FLOWABLE_URL: "http://flowable:8080"
+      FLOWABLE_USER: ${FLOWABLE_USER:-rest-admin}
+      FLOWABLE_PASS: ${FLOWABLE_PASS:-test}
+    ports: [ "3000:3000" ]
+    depends_on: [ plane-proxy, flowable ]
+volumes:
+  postgres_data: {}
+  redis_data: {}
+  minio_data: {}

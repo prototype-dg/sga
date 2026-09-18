@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://demo.andersen/sga" id="RFC_process_di">
+  <process id="RFC_process" name="RFC — Change Management" isExecutable="true">
+    <startEvent id="rfcStart" name="Création RFC"/>
+    <sequenceFlow id="f1" sourceRef="rfcStart" targetRef="rfcInstruction"/>
+    <userTask id="rfcInstruction" name="En cours d'instruction" flowable:candidateGroups="it-ops">
+      <extensionElements>
+        <modeler:initiator-can-complete xmlns:modeler="http://flowable.org/modeler" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/>
+      </extensionElements>
+    </userTask>
+    <sequenceFlow id="f2" sourceRef="rfcInstruction" targetRef="rfcSecurity"/>
+    <userTask id="rfcSecurity" name="Validation sécurité" flowable:candidateGroups="security">
+      <humanPerformer xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
+        <resourceAssignmentExpression>
+          <formalExpression>${initiator}</formalExpression>
+        </resourceAssignmentExpression>
+      </humanPerformer>
+    </userTask>
+    <sequenceFlow id="f3" sourceRef="rfcSecurity" targetRef="rfcValidate"/>
+    <userTask id="rfcValidate" name="Validation métier" flowable:candidateGroups="it-ops"/>
+    <sequenceFlow id="f4" sourceRef="rfcValidate" targetRef="rfcExecuted"/>
+    <serviceTask id="rfcNotify" name="Notifier le groupe en charge" flowable:delegateExpression="${emailPostFunction}"/>
+    <sequenceFlow id="f5" sourceRef="rfcExecuted" targetRef="rfcNotify"/>
+    <endEvent id="rfcExecuted" name="EXÉCUTÉ AVEC SUCCÈS"/>
+    <sequenceFlow id="f6" sourceRef="rfcNotify" targetRef="rfcEnd"/>
+    <endEvent id="rfcEnd"/>
+  </process>
+</definitions>
