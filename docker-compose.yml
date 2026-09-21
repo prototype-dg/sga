@@ -6,7 +6,10 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
-    environment: [ POSTGRES_USER: plane, POSTGRES_PASSWORD: plane, POSTGRES_DB: plane ]
+    environment:
+      POSTGRES_USER: plane
+      POSTGRES_PASSWORD: plane
+      POSTGRES_DB: plane
     volumes: [ "postgres_data:/var/lib/postgresql/data" ]
     healthcheck: { test: ["CMD-SHELL", "pg_isready -U plane"], interval: 10s, timeout: 5s, retries: 5 }
   redis:
@@ -17,7 +20,9 @@ services:
     image: minio/minio:latest
     restart: unless-stopped
     command: server /data --console-address ":9001"
-    environment: [ MINIO_ROOT_USER: plane, MINIO_ROOT_PASSWORD: plane12345 ]
+    environment:
+      MINIO_ROOT_USER: plane
+      MINIO_ROOT_PASSWORD: plane12345
     volumes: [ "minio_data:/data" ]
   createbuckets:
     image: minio/mc:latest
@@ -62,7 +67,9 @@ services:
   flowable:
     image: flowable/flowable-rest:latest
     restart: unless-stopped
-    environment: [ SPRING_PROFILES_ACTIVE: "dev", flowable.rest.app.authentication-mode: "basic" ]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      FLOWABLE_REST_APP_AUTHENTICATION_MODE: basic
     ports: [ "8081:8080" ]
   middleware:
     build: ./apps/middleware
