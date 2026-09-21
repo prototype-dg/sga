@@ -7,41 +7,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
-        uses: azure/login@v2
+      - id: guard
+        run: |
+          if [ -n "${{ secrets.AZURE_CREDENTIALS }}" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; else echo "run=false" >> "$GITHUB_OUTPUT"; echo "No AZURE_CREDENTIALS secret - skipping deploy (no-op run)."; fi
+      - uses: azure/login@v2
+        if: steps.guard.outputs.run == 'true'
         with: { creds: '${{ secrets.AZURE_CREDENTIALS }}' }
-      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
-        name: Ensure App Service plan + web app exist (idempotent)
+      - name: Ensure webapp (idempotent)
+        if: steps.guard.outputs.run == 'true'
         run: |
-          az appservice plan create --name "${{ vars.SGA_PLAN }}" --resource-group "${{ vars.AZURE_RG }}" \
-            --sku B1 --is-linux --output none 2>/dev/null || true
-          az webapp create --name "${{ vars.AZURE_WEBAPP }}" --resource-group "${{ vars.AZURE_RG }}" \
-            --plan "${{ vars.SGA_PLAN }}" --runtime "NODE:22-lts" --output none 2>/dev/null || true
-      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
-        name: Set app settings
+          az appservice plan create -n "${{ vars.SGA_PLAN }}" -g "${{ vars.AZURE_RG }}" --sku B1 --is-linux --output none 2>/dev/null || true
+          az webapp create -n "${{ vars.AZURE_WEBAPP }}" -g "${{ vars.AZURE_RG }}" -p "${{ vars.SGA_PLAN }}" --runtime "NODE:22-lts" --output none 2>/dev/null || true
+      - name: Bundle + deploy zip
+        if: steps.guard.outputs.run == 'true'
         run: |
-          az webapp config appsettings set --name "${{ vars.AZURE_WEBAPP }}" --resource-group "${{ vars.AZURE_RG }}" \
-            --settings \
-              NODE_ENV=production \
-              PLANE_URL="${{ vars.PLANE_URL }}" \
-              FLOWABLE_URL="${{ vars.FLOWABLE_URL }}" \
-              PLANE_WEBHOOK_SECRET="${{ secrets.PLANE_WEBHOOK_SECRET }}" \
-              PLANE_ADMIN_TOKEN="${{ secrets.PLANE_ADMIN_TOKEN }}" \
-              FLOWABLE_USER=rest-admin FLOWABLE_PASS=test --output none
-      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
-        name: Zip webapp bundle (no deps — pure Node stdlib)
+          cd webapp && zip -qr ../deploy-webapp.zip src package.json && cd ..
+          az webapp deploy -n "${{ vars.AZURE_WEBAPP }}" -g "${{ vars.AZURE_RG }}" --src-path deploy-webapp.zip --type zip --output none
+          az webapp restart -n "${{ vars.AZURE_WEBAPP }}" -g "${{ vars.AZURE_RG }}" --output none
+      - name: Smoke /healthz
+        if: steps.guard.outputs.run == 'true'
         run: |
-          cd webapp && zip -r ../deploy-webapp.zip . --exclude "*.git*" && cd .. && du -sh deploy-webapp.zip
-      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
-        name: Deploy zip (synchronous)
-        run: az webapp deploy --name "${{ vars.AZURE_WEBAPP }}" --resource-group "${{ vars.AZURE_RG }}" --src-path deploy-webapp.zip --type zip
-      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
-        name: Restart + smoke
-        run: |
-          az webapp restart --name "${{ vars.AZURE_WEBAPP }}" --resource-group "${{ vars.AZURE_RG }}"
           for i in $(seq 1 40); do
-            CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 15 "https://${{ vars.AZURE_WEBAPP }}.azurewebsites.net/healthz" || echo 000)
-            echo "attempt $i: $CODE"
-            [ "$CODE" = "200" ] && echo "WEBAPP LIVE" && exit 0
-            sleep 15
+            C=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 15 "https://${{ vars.AZURE_WEBAPP }}.azurewebsites.net/healthz" || echo 000)
+            echo "attempt $i: $C"; [ "$C" = "200" ] && echo "WEBAPP LIVE" && exit 0; sleep 15
           done; exit 1

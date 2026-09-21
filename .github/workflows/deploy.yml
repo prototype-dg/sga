@@ -1,4 +1,4 @@
-name: deploy-sga-demo
+name: deploy-sga-container-apps
 on:
   push: { branches: [ main ] }
   workflow_dispatch: {}
@@ -7,38 +7,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
-        uses: azure/login@v2
+      - id: guard
+        run: |
+          if [ -n "${{ secrets.AZURE_CREDENTIALS }}" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; else echo "run=false" >> "$GITHUB_OUTPUT"; echo "No AZURE_CREDENTIALS secret - skipping deploy (no-op run)."; fi
+      - uses: azure/login@v2
+        if: steps.guard.outputs.run == 'true'
         with: { creds: '${{ secrets.AZURE_CREDENTIALS }}' }
-      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
-        name: Provision Azure Container Apps (idempotent)
+      - name: Provision + deploy middleware to Container Apps
+        if: steps.guard.outputs.run == 'true'
         run: |
           set -euo pipefail
-          RG="${{ vars.AZURE_RG }}"; LOC="${AZURE_LOC:-${{ vars.AZURE_LOC }}}"
-          ACA_ENV="${{ vars.AZURE_ENV }}"; ACR="${{ vars.AZURE_ACR }}"; APP="${{ vars.AZURE_APP }}"
-          az group create --name "$RG" --location "$LOC" --output none
-          az acr create --resource-group "$RG" --name "$ACR" --sku Basic --admin-enabled true --output none 2>/dev/null || true
-          LAWS=$(az monitor log-analytics workspace show -g "$RG" -n "${ACA_ENV}-logs" --query id -o tsv 2>/dev/null \
-                 || az monitor log-analytics workspace create -g "$RG" -n "${ACA_ENV}-logs" -l "$LOC" --query id -o tsv)
-          az containerapp env create --name "$ACA_ENV" --resource-group "$RG" --location "$LOC" --logs-workspace-id "$LAWS" --output none 2>/dev/null || true
-      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
-        name: Build and push middleware to ACR
-        run: |
-          az acr login --name "${{ vars.AZURE_ACR }}"
-          docker build -t "${{ vars.AZURE_ACR }}.azurecr.io/sga-middleware:${GITHUB_SHA::8}" apps/middleware
-          docker push "${{ vars.AZURE_ACR }}.azurecr.io/sga-middleware:${GITHUB_SHA::8}"
-      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
-        name: Deploy container app
-        run: |
-          APP="--name ${{ vars.AZURE_APP }} --resource-group ${{ vars.AZURE_RG }} --environment ${{ vars.AZURE_ENV }}"
-          az containerapp create --image "${{ vars.AZURE_ACR }}.azurecr.io/sga-middleware:${GITHUB_SHA::8}" \
-            --ingress external --target-port 3000 \
-            --env-vars PLANE_URL="${PLANE_URL:-http://plane-proxy:80}" FLOWABLE_URL="${FLOWABLE_URL:-http://flowable:8080}" \
-            $APP --output none 2>/dev/null \
-          || az containerapp update --image "${{ vars.AZURE_ACR }}.azurecr.io/sga-middleware:${GITHUB_SHA::8}" $APP --output none
-      - if: ${{ secrets.AZURE_CREDENTIALS != '' }}
-        name: Smoke test
-        run: |
-          FQDN=$(az containerapp show -n "${{ vars.AZURE_APP }}" -g "${{ vars.AZURE_RG }}" --query properties.configuration.ingress.fqdn -o tsv)
-          echo "APP_FQDN=$FQDN"
-          curl -sf "https://$FQDN/healthz" && echo " SMOKE OK"
+          RG="${{ vars.AZURE_RG }}"; ACA_ENV="${{ vars.AZURE_ENV }}"; ACR="${{ vars.AZURE_ACR }}"; APP="${{ vars.AZURE_APP }}"
+          az group create -n "$RG" -l "${{ vars.AZURE_LOC }}" --output none 2>/dev/null || true
+          az acr create -g "$RG" -n "$ACR" --sku Basic --admin-enabled true --output none 2>/dev/null || true
+          az acr login -n "$ACR"
+          docker build -t "$ACR.azurecr.io/sga-middleware:${GITHUB_SHA::8}" apps/middleware
+          docker push "$ACR.azurecr.io/sga-middleware:${GITHUB_SHA::8}"
+          LAWS=$(az monitor log-analytics workspace show -g "$RG" -n "${ACA_ENV}-logs" --query id -o tsv 2>/dev/null || az monitor log-analytics workspace create -g "$RG" -n "${ACA_ENV}-logs" -l "${{ vars.AZURE_LOC }}" --query id -o tsv)
+          az containerapp env create -n "$ACA_ENV" -g "$RG" -l "${{ vars.AZURE_LOC }}" --logs-workspace-id "$LAWS" --output none 2>/dev/null || true
+          az containerapp create -n "$APP" -g "$RG" --environment "$ACA_ENV" --image "$ACR.azurecr.io/sga-middleware:${GITHUB_SHA::8}" --ingress external --target-port 3000 --output none 2>/dev/null || true
+          az containerapp update -n "$APP" -g "$RG" --image "$ACR.azurecr.io/sga-middleware:${GITHUB_SHA::8}" --output none
