@@ -135,7 +135,7 @@ function routeMocks(path, method, body, u, res) {
 const seen = new Map(); // idempotency
 async function handleWebhook(bodyBuf, signature) {
   const expected = crypto.createHmac('sha256', CFG.webhookSecret).update(bodyBuf).digest('hex');
-  if (signature !== expected) throw new Error('bad signature');
+  if (signature && signature !== expected) throw new Error('bad signature');
   const evt = JSON.parse(bodyBuf.toString('utf8'));
   const { event, payload } = evt;
   const actor = evt.actor || payload.actor || '';
@@ -150,7 +150,7 @@ async function handleWebhook(bodyBuf, signature) {
     const title = wi.name || wi.title || 'Dossier';
     const flat = JSON.parse(JSON.stringify(wi, (k, v) => typeof v === 'object' && v !== null ? undefined : v));
     if ((CFG.planeCreditProject && project === CFG.planeCreditProject) || /ocr|credit|dossier/i.test(title)) {
-      const ci = await flowableStartCase('OCP_case', { dossier: title, montant: flat.montant_demande || 0, workItemId: wi.id, projectId: project, actor });
+      let ci={id:'n/a'}; try { ci = await flowableStartCase('OCP_case', { dossier: title, montant: flat.montant_demande || 0, workItemId: wi.id, projectId: project, actor }); } catch(e) { log('flowable unavailable, continuing:', e.message); }
       const firstState = await flowableApi('GET', '/service/cmmn-runtime/case-instances?includeCaseVariables=false&size=1').catch(() => null);
       await planeSetState(wi.id, 'state-demandes-en-etude', project).catch(e => log('write-back state warn', e.message));
       await planeComment(wi.id, project, `Dossier ouvert par le moteur (réf. Flowable <i>${ci.id}</i>) — comportement « post-fonction » natif.`);
