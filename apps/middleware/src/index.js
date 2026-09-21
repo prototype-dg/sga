@@ -112,21 +112,21 @@ const mocks = {
   },
   sms: { 'POST /send': (b) => ({ queued: true, to: b.to, text: b.text, log: `SMS → client ${b.to}: ${b.text}` }) },
   ad: {
-    'GET /users': (_, u) => ({ users: ['BOUKHAROUBA Y.', 'HEMRI M.', 'NEMRI S.', 'OUALID A.'].filter(n => !u.get('q') || n.toLowerCase().includes(u.get('q').toLowerCase())) }),
+    'GET /users': (_, u) => ({ users: ['AMINE H.', 'BOUKHAROUBA Y.', 'HEMRI M.', 'NEMRI S.', 'OUALID A.'].filter(n => !(u && u.get && u.get('q')) || n.toLowerCase().includes(u.get('q').toLowerCase())) }),
     'GET /groups': () => ({ groups: ['CAD', 'ETUDE-CREDIT', 'AGENCE', 'BACK-OFFICE', 'SECURITE', 'DIRECTION'] }),
   },
-  db: { 'GET /client/:id': (p) => ({ id: p.id, nom: 'AMINE H.', situation: 'OK', encours: 1250000, plafond: 3500000, risque: 'FAIBLE' }) },
+  db: { 'GET /client/:id': (b, u, p) => ({ id: (p && p.id) || 'CLT-10042', nom: 'AMINE H.', situation: 'OK', encours: 1250000, plafond: 3500000, risque: 'FAIBLE' }) },
   docgen: {
     'POST /render': (b) => ({ file: `DECISION_${(b.dossier || 'OCR').toUpperCase()}.txt`, content: 'Décision de crédit (MOCK)\n=======================\n' + JSON.stringify(b, null, 2) }),
   },
 };
 function routeMocks(path, method, body, u, res) {
   const parts = path.replace('/mock/', '').split('/'); // e.g. axa/questionnaire
-  const svc = parts[0]; const op = '/' + method + '/' + parts.slice(1).join('/');
+  const svc = parts[0]; const op = method + ' /' + parts.slice(1).join('/');  // 'POST /questionnaire'
   for (const key of Object.keys(mocks[svc] || {})) {
     const pat = new RegExp('^' + key.replace(/:[a-z]+/g, '([^/]+)') + '$', 'i');
     const m = op.match(pat);
-    if (m) { const params = {}; [...key.matchAll(/:([a-z]+)/g)].forEach((k, i) => params[k[1]] = m[i + 1]); return json(res, 200, mocks[svc][key](body, u, params)); }
+    if (m) { const params = {}; [...key.matchAll(/:([a-z]+)/g)].forEach((k, i) => params[k[1]] = m[i + 1]); return json(res, 200, mocks[svc][key](body, u.searchParams, params)); }
   }
   return json(res, 404, { error: 'mock not found', path });
 }

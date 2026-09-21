@@ -1,0 +1,16 @@
+#cloud-config
+package_update: true
+packages: [docker.io, docker-compose-v2, git, zstd]
+runcmd:
+  - git clone https://github.com/prototype-dg/sga.git /opt/sga
+  - cp /opt/sga/plane/plane.env.example /opt/sga/plane/plane.env
+  - |
+    IP=$(curl -s https://api.ipify.org)
+    sed -i "s|^SITE_URL=.*|SITE_URL=http://${IP}:8080|" /opt/sga/plane/plane.env
+    sed -i "s|^CORS_ALLOWED_ORIGINS=.*|CORS_ALLOWED_ORIGINS=http://${IP}:8080|" /opt/sga/plane/plane.env
+    echo "VM_IP=${IP}" >> /etc/environment
+  - cd /opt/sga && docker compose up -d
+  - |
+    echo '#!/bin/bash
+    cd /opt/sga && docker compose up -d' > /usr/local/bin/sga-start
+    chmod +x /usr/local/bin/sga-start
