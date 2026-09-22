@@ -70,6 +70,17 @@ async function planeSetState(workItemId, stateId, projectId) {
 async function planeComment(workItemId, projectId, htmlBody) {
   return planeApi('POST', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${projectId}/work-items/${workItemId}/comments/`, { comment_html: `<p>${htmlBody}</p>` });
 }
+const stateCache = new Map();
+async function planeFirstStateId(projectId, namePrefix) {
+  const key = projectId + ':' + namePrefix;
+  if (stateCache.has(key)) return stateCache.get(key);
+  try {
+    const page = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${projectId}/states/`);
+    const hit = (page.results || []).find(st => st.name && st.name.toLowerCase().startsWith(namePrefix.toLowerCase()));
+    if (hit) { stateCache.set(key, hit.id); return hit.id; }
+  } catch (e) { log('state lookup warn', e.message.slice(0, 100)); }
+  return null;
+}
 async function planeCreateWorkItem(projectId, payload) {
   return planeApi('POST', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${projectId}/work-items/`, payload);
 }
@@ -144,7 +155,8 @@ async function handleWebhook(bodyBuf, signature) {
     if ((CFG.planeCreditProject && project === CFG.planeCreditProject) || /ocr|credit|dossier/i.test(title)) {
       let ci = { id: 'n/a' };
       try { ci = await flowableStartProcess('OCP_case', { dossier: title, montant: flat.montant_demande || 0, workItemId: wi.id, projectId: project, actor }); } catch (e) { log('flowable unavailable, continuing:', e.message); }
-      await planeSetState(wi.id, 'state-demandes-en-etude', project).catch(e => log('write-back state warn', e.message));
+      const sid = await planeFirstStateId(project, 'Demande en etude');
+      if (sid) await planeSetState(wi.id, sid, project).catch(e => log('write-back state warn', e.message));
       await planeComment(wi.id, project, `Dossier ouvert par le moteur (réf. Flowable <i>${ci.id}</i>) — comportement « post-fonction » natif.`);
       return { ok: true, caseId: ci.id };
     }
@@ -194,13 +206,6 @@ async function resetDemoData() {
       }
     } catch (e) { out.errors.push(`project ${pid}: ${e.message.slice(0, 160)}`); }
   }
-  try {
-    const cases = await flowableApi('GET', '/service/cmmn-runtime/case-instances?size=100');
-    for (const c of (cases.data || [])) {
-      try { await flowableApi('DELETE', `/service/cmmn-runtime/case-instances/${c.id}?cascade=true`); out.deletedCases++; }
-      catch (e) { out.errors.push(`case ${c.id}: ${e.message.slice(0, 120)}`); }
-    }
-  } catch (e) { out.errors.push(`cases list: ${e.message.slice(0, 160)}`); }
   try {
     const procs = await flowableApi('GET', '/service/runtime/process-instances?size=100');
     for (const p of (procs.data || [])) {
