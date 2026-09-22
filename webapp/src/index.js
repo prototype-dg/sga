@@ -143,7 +143,7 @@ async function handleWebhook(bodyBuf, signature) {
     const flat = JSON.parse(JSON.stringify(wi, (k, v) => typeof v === 'object' && v !== null ? undefined : v));
     if ((CFG.planeCreditProject && project === CFG.planeCreditProject) || /ocr|credit|dossier/i.test(title)) {
       let ci = { id: 'n/a' };
-      try { ci = await flowableStartCase('OCP_case', { dossier: title, montant: flat.montant_demande || 0, workItemId: wi.id, projectId: project, actor }); } catch (e) { log('flowable unavailable, continuing:', e.message); }
+      try { ci = await flowableStartProcess('OCP_case', { dossier: title, montant: flat.montant_demande || 0, workItemId: wi.id, projectId: project, actor }); } catch (e) { log('flowable unavailable, continuing:', e.message); }
       await planeSetState(wi.id, 'state-demandes-en-etude', project).catch(e => log('write-back state warn', e.message));
       await planeComment(wi.id, project, `Dossier ouvert par le moteur (réf. Flowable <i>${ci.id}</i>) — comportement « post-fonction » natif.`);
       return { ok: true, caseId: ci.id };
