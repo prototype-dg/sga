@@ -350,7 +350,7 @@ fetch('/inspector/api/model?t='+Date.now()).then(function(r){ if(!r.ok){throw ne
   }catch(e){showErr('init viewer: '+String(e))}
 }).catch(function(e){var m=String(e&&e.message||e);
   if(m.indexOf('empty:')===0){var c=document.getElementById('canvas');
-    if(!c.getAttribute('data-empty')){c.setAttribute('data-empty','1');c.innerHTML='<div style="color:#6f6f78;font:13px \'Montserrat\',sans-serif;padding:24px;text-align:center;padding-top:190px">Aucun workflow migr\u00e9.<br><span style="font-size:11px">Le mod\u00e8le BPMN appara\u00eetra ici automatiquement (~5 s) apr\u00e8s la migration : terminal op\u00e9rateur \u2192 jira-import / workflow-migrate.</span></div>'}
+    if(!c.getAttribute('data-empty')){c.setAttribute('data-empty','1');c.innerHTML='<div style="color:#6f6f78;font:13px Montserrat,sans-serif;padding:24px;text-align:center;padding-top:190px">Aucun workflow migr\u00e9.<br><span style="font-size:11px">Le mod\u00e8le BPMN appara\u00eetra ici automatiquement (~5 s) apr\u00e8s la migration : terminal op\u00e9rateur \u2192 jira-import / workflow-migrate.</span></div>'}
     setTimeout(loadModel,5000);}
   else {showErr('chargement du modele: '+m);setTimeout(loadModel,10000);}
 })}
