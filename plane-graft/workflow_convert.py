@@ -103,6 +103,10 @@ for nm in names:
         flow(sid(nm), 'end')
 O.append('  </process>')
 
+# ---------------- Embedded Graphviz layout (computed for the client XML) ----------------
+EMBED = {"start": [142, 627], "task_5": [2401, 851], "task_8": [847, 808], "task_9": [1365, 807], "task_10": [1365, 1149], "task_11": [1883, 1502], "task_12": [2401, 1439], "task_13": [1624, 1294], "task_14": [2142, 1584], "task_15": [2401, 1805], "task_16": [2401, 1319], "task_17": [2660, 2379], "task_18": [3178, 2543], "task_19": [3437, 2644], "task_20": [2401, 2278], "task_21": [3696, 2683], "task_22": [3955, 2804], "task_23": [4214, 2480], "task_25": [3955, 2562], "task_26": [329, 605], "task_27": [1624, 1786], "task_28": [1883, 1937], "task_29": [1883, 1786], "task_30": [2142, 2480], "task_31": [4473, 2581], "task_33": [70, 1969], "task_34": [329, 1477], "task_35": [1106, 402], "task_36": [70, 200], "task_37": [329, 200], "task_38": [588, 80], "task_39": [588, 200], "task_40": [70, 30], "task_41": [4732, 2531], "task_42": [1106, 686], "appli_0": [1106, 1048], "appli_1": [1106, 928], "appli_2": [1624, 1092], "appli_3": [2142, 1155], "appli_4": [2660, 829], "appli_5": [2401, 1685], "appli_6": [2919, 2480], "appli_7": [3696, 2461], "appli_8": [588, 808], "appli_9": [588, 402], "appli_10": [2401, 2480], "appli_11": [588, 1111], "end": [401, 52]}
+SPLINE = {}
+
 # ---------------- Graph layout (serpentine layered, banded stacking) ----------------
 W, H = 180, 80          # task shape size
 SW, SH = 36, 36         # event shape size
@@ -182,6 +186,8 @@ for band in range((maxL // PER_ROW) + 1):
             band_h = max(band_h, k * SLOT_H + (h if n in ('start', 'end') else H) + 30)
     band_y += band_h + 70
 size = {n: (SW, SH) if n in ('start', 'end') else (W, H) for n in allnodes}
+if set(EMBED) >= set(allnodes):
+    coords = {n: tuple(EMBED[n]) for n in allnodes}
 
 def clip(cx1, cy1, cx2, cy2, w, h):
     dx, dy = cx2 - cx1, cy2 - cy1
@@ -252,7 +258,7 @@ def route(a, b):
 
 n_self = 0
 for fid, a, b in flows:
-    pts = route(a, b)
+    pts = SPLINE.get(fid) or route(a, b)
     if a == b:
         n_self += 1
     wp = ''.join('<di:waypoint x="%d" y="%d"/>' % p2 for p2 in pts)

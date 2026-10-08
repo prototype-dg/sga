@@ -332,7 +332,13 @@ select{background:#0c0c10;color:#e8e6e1;border:1px solid #2a2a33;border-radius:6
 <script>
 var viewer=null;
 function showErr(m){var c=document.getElementById('canvas');if(c)c.innerHTML='<div style="color:#ff6b6b;font:12px monospace;padding:14px">BPMN : '+String(m).replace(/</g,'&lt;')+'</div>'}
+var modelLoaded=false;
+var stEl=document.createElement('span');stEl.id='st-model';stEl.style.cssText='color:#febc2e;font-size:11px;margin-left:8px';stEl.textContent='\u23f3 en attente de migration \u2014 v\u00e9rification toutes les 5 s';document.querySelector('.sub').appendChild(stEl);
+function loadModel(){
 fetch('/inspector/api/model').then(function(r){ if(!r.ok){throw new Error('empty:'+r.status)} return r.text()}).then(function(x){
+  if(modelLoaded)return; modelLoaded=true;
+  stEl.textContent='\u2713 mod\u00e8le migr\u00e9 charg\u00e9';stEl.style.color='#28c840';
+  var c=document.getElementById('canvas');c.innerHTML='';c.removeAttribute('data-empty');
   try{
     viewer=new BpmnJS({container:'#canvas'});
     viewer.importXML(x).then(function(){
@@ -342,9 +348,14 @@ fetch('/inspector/api/model').then(function(r){ if(!r.ok){throw new Error('empty
     }).catch(function(e){showErr('importXML: '+(e&&e.message?e.message:e))});
   }catch(e){showErr('init viewer: '+String(e))}
 }).catch(function(e){var m=String(e&&e.message||e);
-  if(m.indexOf('empty:')===0){var c=document.getElementById('canvas');if(c)c.innerHTML='<div style="color:#6f6f78;font:13px \'Montserrat\',sans-serif;padding:24px;text-align:center;padding-top:190px">Aucun workflow migr\u00e9.<br><span style="font-size:11px">Le mod\u00e8le BPMN migr\u00e9 depuis Jira appara\u00eetra ici pendant la d\u00e9mo : terminal op\u00e9rateur \u2192 workflow-migrate.</span></div>'}
-  else showErr('chargement du modele: '+m)});
-fetch('/inspector/api/instances').then(function(r){return r.json()}).then(function(d){var sel=document.getElementById('inst');sel.innerHTML='';(d.data||[]).forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=(p.processDefinitionName||p.processDefinitionKey)+' — '+p.id.slice(0,8);sel.appendChild(o)});if(!(d.data||[]).length){sel.innerHTML='<option value="">aucun processus actif</option>'}});
+  if(m.indexOf('empty:')===0){var c=document.getElementById('canvas');
+    if(!c.getAttribute('data-empty')){c.setAttribute('data-empty','1');c.innerHTML='<div style="color:#6f6f78;font:13px \'Montserrat\',sans-serif;padding:24px;text-align:center;padding-top:190px">Aucun workflow migr\u00e9.<br><span style="font-size:11px">Le mod\u00e8le BPMN appara\u00eetra ici automatiquement (~5 s) apr\u00e8s la migration : terminal op\u00e9rateur \u2192 jira-import / workflow-migrate.</span></div>'}
+    setTimeout(loadModel,5000);}
+  else {showErr('chargement du modele: '+m);setTimeout(loadModel,10000);}
+})}
+loadModel();
+function loadInstances(){fetch('/inspector/api/instances').then(function(r){return r.json()}).then(function(d){var sel=document.getElementById('inst');var cur=sel.value;var opts=(d.data||[]);sel.innerHTML='';opts.forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=(p.processDefinitionName||p.processDefinitionKey)+' — '+p.id.slice(0,8);sel.appendChild(o)});if(cur&&opts.some(function(p){return p.id===cur}))sel.value=cur;if(!opts.length){sel.innerHTML='<option value="">aucun processus actif</option>'}}).catch(function(e){})}
+loadInstances();setInterval(loadInstances,10000);
 function load(){var id=document.getElementById('inst').value;if(!id)return;
 fetch('/inspector/api/instance/'+id).then(function(r){return r.json()}).then(function(d){
  var tl=document.getElementById('tl');tl.innerHTML='';
@@ -429,9 +440,20 @@ async function runResetJob() {
   resetJob.running = true; resetJob.startedAt = Date.now(); resetJob.finishedAt = null; resetJob.done = 0; resetJob.total = 0; resetJob.errors = []; resetJob.result = null; resetJob.phase = 'wiping Plane';
   MIGRATED = false; SUPPRESS_WEBHOOK = true;
   try {
-    const planePart = await resetPlaneOnly();
+    let planePart = { deletedWorkItems: 0, dbWipe: false, errors: [] };
+    try {
+      const r = await agentRun('plane-wipe');
+      if (r && r.exit === 0) planePart.dbWipe = true; else planePart.errors.push('agent plane-wipe failed: ' + String(r && r.stderr).slice(0, 120));
+    } catch (e) { planePart.errors.push('agent unreachable: ' + e.message.slice(0, 100)); }
+    if (!planePart.dbWipe) planePart = await resetPlaneOnly();
     resetJob.phase = 'wiping Flowable';
-    const flowPart = await resetFlowableOnly();
+    let flowPart = { deletedProcesses: 0, defsDeleted: 0, errors: [] };
+    try {
+      const r = await agentRun('flowable-clean');
+      if (r && r.exit === 0) { const m = String(r.stdout || '').match(/(\d+) instances deleted, (\d+) migrated defs/); flowPart.deletedProcesses = m ? +m[1] : 0; flowPart.defsDeleted = m ? +m[2] : 0; }
+      else flowPart.errors.push('agent flowable-clean failed: ' + String(r && r.stderr).slice(0, 120));
+    } catch (e) { flowPart.errors.push('agent unreachable: ' + e.message.slice(0, 100)); }
+    if (!flowPart.deletedProcesses && !flowPart.defsDeleted) flowPart = await resetFlowableOnly();
     resetJob.phase = 'seeding Plane';
     const planeSeeded = await planeSeedDemo();
     resetJob.phase = 'wiping Jira';
@@ -716,7 +738,13 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET' && pathName === '/terminal') return html(res, 200, execPage());
     if (method === 'GET' && pathName === '/inspector') return html(res, 200, inspectorPage());
     if (method === 'GET' && pathName === '/inspector/api/model') {
-      if (!MIGRATED) return json(res, 404, { empty: true, reason: 'Aucun workflow migr\u00e9 \u2014 la migration Jira\u2192BPMN se fait en direct pendant la d\u00e9mo (terminal op\u00e9rateur).' });
+      if (!MIGRATED) {
+        try {
+          const defs = await flowableApi('GET', '/service/repository/process-definitions?latest=false&size=200');
+          if ((defs.data || []).some(x => x.key === 'OCP_case' && (x.version || 0) > 1)) { MIGRATED = true; log('modele migr\u00e9 detect\u00e9 c\u00f4t\u00e9 Flowable (auto)'); }
+        } catch (e) { }
+        if (!MIGRATED) return json(res, 404, { empty: true, reason: 'Aucun workflow migr\u00e9 \u2014 la migration Jira\u2192BPMN se fait en direct pendant la d\u00e9mo (terminal op\u00e9rateur).' });
+      }
       try {
         const r = await fetch(CFG.agentUrl + '/model', { headers: { 'X-Agent-Token': CFG.agentToken } });
         if (r.ok) return send(res, 200, await r.text(), 'application/xml; charset=utf-8');
