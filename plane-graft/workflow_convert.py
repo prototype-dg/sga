@@ -62,17 +62,73 @@ START = 'Demande Re\u00e7ue'
 appli = [(f, n, t) for (f, n, t) in uniq if '[APPLI]' in n]
 plain = [(f, n, t) for (f, n, t) in uniq if '[APPLI]' not in n]
 
+# ---------------- FR -> EN (names) + system-call classification ----------------
+EN_STEP = {
+ 'Attente AXA': 'Awaiting AXA (insurance)',
+ 'Demande en étude': 'Application under review',
+ 'Demande refusée': 'Application refused',
+ 'Attente décision': 'Awaiting decision',
+ 'Demande initiée': 'Application initiated',
+ 'Demande rejetée': 'Application rejected',
+ 'Attente infos Supp Décisionnaire': 'Awaiting additional info - Decision Maker',
+ 'Etude en cours': 'Review in progress',
+ 'Montage à refaire': 'Restructuring required',
+ 'Attente infos supp BO': 'Awaiting additional info - Back Office',
+ 'Garanties à recueillir': 'Collaterals to be collected',
+ 'Garanties reçues': 'Collaterals received',
+ 'Attente complément': 'Awaiting additional documents',
+ 'Dossier Constitué': 'Case file assembled',
+ 'garantie pré-validée': 'Collateral pre-validated',
+ 'Attente info supp garantie': 'Awaiting additional collateral info',
+ 'Dossier décaissé': 'Case disbursed',
+ 'Garantie validée': 'Collateral validated',
+ 'Demande Reçue': 'Application received',
+ 'Dérogation demandée': 'Waiver requested',
+ 'Attente Info Supp DR': 'Awaiting additional info - Regional Directorate',
+ 'Attente Info Supp RUC': 'Awaiting additional info - RUC',
+ 'Annulé': 'Cancelled',
+ 'Dossier à décaisser': 'Case to be disbursed',
+ "En cours d'annulation": 'Cancellation in progress',
+ 'Attente info sup POS/APPLI': 'Awaiting info from POS/APPLI',
+ 'Demande incomplète': 'Application incomplete',
+ 'Dossier à contrôler': 'Case to be controlled',
+ 'Contrôle en cours': 'Control in progress',
+ 'Contrôle validé': 'Control validated',
+ 'Dossier à compléter': 'Case to be completed',
+ 'Dossier soldé': 'Case settled',
+ 'Dossier décaissé partiellement': 'Case partially disbursed',
+ 'En attente de signature': 'Awaiting signature',
+}
+EN_APPLI = {
+ '[APPLI] - Attente décision': '[APPLI] - Awaiting decision',
+ '[APPLI] - Auto Fournir infos supp APPLI/POS': '[APPLI] - Auto-provide additional APPLI/POS info',
+ '[APPLI] - Compléter la demande': '[APPLI] - Complete the application',
+ '[APPLI] - Constituer dossier - Demander garanties': '[APPLI] - Assemble case - request collaterals',
+ '[APPLI] - Demande refusée': '[APPLI] - Application refused',
+ '[APPLI] - Décaisser dossier': '[APPLI] - Disburse case',
+ '[APPLI] - Décision': '[APPLI] - Decision',
+ '[APPLI] - Défavorable': '[APPLI] - Unfavourable outcome',
+ '[APPLI] - Garanties reçues': '[APPLI] - Collaterals received',
+ '[APPLI] - Garanties à recueillir': '[APPLI] - Collaterals to be collected',
+ '[APPLI] - Soumettre pour décision': '[APPLI] - Submit for decision',
+ '[APPLI] - Test TNR APPLI': '[APPLI] - APPLI non-regression test',
+}
+EXT_APPLI = {'[APPLI] - Constituer dossier - Demander garanties', '[APPLI] - Décaisser dossier', '[APPLI] - Soumettre pour décision'}
+
 # ---------------- BPMN elements ----------------
 O = []
 O.append('<?xml version="1.0" encoding="UTF-8"?>')
-O.append('<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:flowable="http://flowable.org/bpmn" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" targetNamespace="http://flowable.org/sga">')
+O.append('<definitions xmlns:bioc="http://bpmn.io/schema/bpmn/bioc" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:flowable="http://flowable.org/bpmn" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" targetNamespace="http://flowable.org/sga">')
 O.append('  <process id="OCP_case" name="Octroi de Credit (migr\u00e9 depuis Jira)">')
 O.append('    <startEvent id="start" name="Cr\u00e9ation dossier (APPLI)"/>')
 for nm in names:
-    docu = "Etape manuelle (agent) - file : " + nm + " - groupe assigne : SGA-" + nm.split()[0] + ". Le dossier se traite dans Jira ; l'inspecteur fournit le lien direct selon le dossier courant."
+    docu = "FR: " + nm + " - etape manuelle (agent), groupe SGA-" + nm.split()[0] + ", traitement dans Jira. EN: " + EN_STEP.get(nm, nm) + " - manual step (agent), handled in Jira."
     O.append('    <userTask id="%s" name="%s" flowable:candidateGroups="SGA-%s"><documentation>%s</documentation></userTask>' % (sid(nm), esc(nm), esc(nm.split()[0]), esc(docu)))
 for k, (f, n, t) in enumerate(appli):
-    doca = "Etape automatique [APPLI] : " + n + " - executee par le bridge Flowable (delegate appliBridge) vers le SI SGA (appel REST/WSO2), sans intervention agent."
+    if n in EXT_APPLI:
+        doca = "FR: " + n + " - AUTOMATISATION : appel systeme EXTERNE via bridge appliBridge (middleware, WSO2/REST vers le SI partenaire). EN: " + EN_APPLI.get(n, n) + " - EXTERNAL system call (WSO2/REST to partner SI)."
+    else:
+        doca = "FR: " + n + " - AUTOMATISATION : operation systeme INTERNE via bridge appliBridge (middleware, SI SGA). EN: " + EN_APPLI.get(n, n) + " - INTERNAL system operation."
     O.append('    <serviceTask id="appli_%d" name="%s" flowable:delegateExpression="${appliBridge}"><documentation>%s</documentation></serviceTask>' % (k, esc(n), esc(doca)))
 O.append('    <endEvent id="end" name="Fin de parcours"/>')
 
@@ -205,10 +261,19 @@ def center(n):
     return (x + w // 2, y + h // 2)
 O.append('  <bpmndi:BPMNDiagram id="Diagram_1">')
 O.append('    <bpmndi:BPMNPlane id="Plane_1" bpmnElement="OCP_case">')
+BIOCNODE = {}
+for k, (f, n, t) in enumerate(appli):
+    if n in EXT_APPLI:
+        BIOCNODE['appli_%d' % k] = ('#E9041E', '#ff8a96')
+    else:
+        BIOCNODE['appli_%d' % k] = ('#E9741E', '#ffb266')
 for n in allnodes:
     x, y = coords[n]
     w, h = size[n]
-    O.append('      <bpmndi:BPMNShape id="%s_di" bpmnElement="%s"><dc:Bounds x="%d" y="%d" width="%d" height="%d"/></bpmndi:BPMNShape>' % (n, n, x, y, w, h))
+    bx = ''
+    if n in BIOCNODE:
+        bx = ' bioc:fill="%s" bioc:stroke="%s"' % BIOCNODE[n]
+    O.append('      <bpmndi:BPMNShape id="%s_di" bpmnElement="%s"%s><dc:Bounds x="%d" y="%d" width="%d" height="%d"/></bpmndi:BPMNShape>' % (n, n, bx, x, y, w, h))
 band_ys = {}
 for n in allnodes:
     bb = layer[n] // PER_ROW

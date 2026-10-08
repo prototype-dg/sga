@@ -321,16 +321,16 @@ select{background:#0c0c10;color:#e8e6e1;border:1px solid #2a2a33;border-radius:6
 .bjs-done rect{fill:#28c840 !important;fill-opacity:.28 !important}
 .bjs-done circle{fill:#28c840 !important;fill-opacity:.28 !important}
 .bjs-active circle{fill:#E9041E !important;fill-opacity:.4 !important}
-.t-auto rect{fill:#E9041E !important;stroke:#ff8a96 !important}
+
 .t-auto .djs-label{fill:#fff !important}
 .lbl-light .djs-label{fill:#e8e6e1 !important}
 .legend{display:flex;gap:14px;align-items:center;color:#9a9a9a;font-size:11px;margin-top:6px}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
-.legend i.m{background:#fff}.legend i.a{background:#E9041E}
+.legend i.m{background:#fff}.legend i.a{background:#E9041E}.legend i.i{background:#E9741E}
 </style></head><body>
 <h1><span class="dot"></span>SGA Process Inspector — Octroi de Crédit</h1>
 <div class="sub">Ce qui se passe DERRIÈRE chaque action : moteur Flowable en direct — étape courante du processus, historique d'exécution, variables du dossier, journal d'appels de la couche d'intégration.</div>
-<div class="grid"><div class="panel"><h2>Processus (BPMN)</h2><div id="canvas"></div><div class="legend"><span><i class="m"></i>Manuelle (agent)</span><span><i class="a"></i>Automatique [APPLI]</span><span>Cliquez une étape pour le détail</span></div></div>
+<div class="grid"><div class="panel"><h2>Processus (BPMN)</h2><div id="canvas"></div><div class="legend"><span><i class="m"></i>Manuelle (agent)</span><span><i class="a"></i>Auto — appel externe (EN: external call)</span><span><i class="i"></i>Auto — interne (EN: internal)</span><span>Cliquez une étape pour le détail</span></div></div>
 <div><div class="panel"><h2>Dossiers en cours (Flowable)</h2><select id="inst"><option value="">— chargement…</option></select><button class="btn" onclick="load()">Inspecter</button></div>
 <div class="panel" style="margin-top:12px"><h2>Étapes du parcours</h2><div class="tl" id="tl"><span class="empty">Choisissez un dossier puis « Inspecter ».</span></div></div>
 <div class="panel" style="margin-top:12px"><h2>Variables du dossier</h2><div class="vars" id="vars"><span class="empty">—</span></div></div><div class="panel" style="margin-top:12px"><h2>Détail de l'étape</h2><div class="vars" id="detail"><span class="empty">Cliquez sur une étape du diagramme.</span></div></div></div></div>
@@ -341,12 +341,13 @@ function showErr(m){var c=document.getElementById('canvas');if(c)c.innerHTML='<d
 var modelLoaded=false;
 function colorize(){try{var reg=viewer.get('elementRegistry');var cv=viewer.get('canvas');reg.getAll().forEach(function(el){if(el.type==='bpmn:UserTask')cv.addMarker(el.id,'t-manual');if(el.type==='bpmn:ServiceTask')cv.addMarker(el.id,'t-auto');if(el.type==='label'&&el.labelTarget&&(el.labelTarget.type==='bpmn:SequenceFlow'||el.labelTarget.type==='bpmn:StartEvent'||el.labelTarget.type==='bpmn:EndEvent'))cv.addMarker(el.id,'lbl-light')})}catch(e){}}
 function bindClick(){try{viewer.get('eventBus').on('element.click',function(e){var el=e.element;if(!el||!el.type||el.type.indexOf('Task')===-1)return;var isAuto=el.type==='bpmn:ServiceTask';var doc='';try{var bo=el.businessObject;doc=(bo.documentation&&bo.documentation[0]&&bo.documentation[0].text)||''}catch(x){}
+var isExt=isAuto&&doc.indexOf('EXTERNE')!==-1;var isInt=isAuto&&!isExt;var enName='';try{var mEN=doc.split(' EN: ')[1];if(mEN)enName=mEN.split(' - ')[0]}catch(x){}
 var v=window._curVars||{};var ref=null;var nm2=String(v.dossierName||'');var p2=nm2.split('OCP-')[1];if(!p2){nm2=String(v.dossierId||'');p2=nm2.split('OCP-')[1]}if(p2)ref='OCP-'+p2.slice(0,9);
 var url=ref?('http://74.162.153.131:8080/issues/?jql='+encodeURIComponent('summary ~ "'+ref+'"')):'http://74.162.153.131:8080/jira/software/c/projects/OCP';
 var h='<div><b>'+(el.businessObject.name||el.id)+'</b></div>';
-h+='<div style="margin:4px 0"><span style="color:'+(isAuto?'#E9041E':'#28c840')+';font-weight:600">'+(isAuto?'AUTOMATIQUE [APPLI]':'MANUELLE (agent)')+'</span></div>';
+h+='<div style="margin:4px 0"><span style="color:'+(isExt?'#E9041E':isInt?'#E9741E':'#28c840')+';font-weight:600">'+(isExt?'AUTOMATIQUE — APPEL SYSTEME EXTERNE (WSO2/REST)':isInt?'AUTOMATIQUE — OPERATION SYSTEME INTERNE':'MANUELLE (agent)')+'</span>'+(enName?'<span style="color:#9a9a9a;font-weight:400"> — EN: '+enName+'</span>':'')+'</div>';
 h+='<div style="color:#9a9a9a;font-size:11px;line-height:1.6">'+doc+'</div>';
-if(isAuto){h+='<div style="margin-top:6px;font:11px monospace;color:#febc2e">bridge appliBridge > middleware > appel REST/WSO2 cote SGA</div>'}else{h+='<div style="margin-top:6px">Dossier courant : '+(ref||'-')+'<br><a href="'+url+'" target="_blank" style="color:#E9041E">Ouvrir le dossier dans Jira</a></div>'}
+if(isExt){h+='<div style="margin-top:6px;font:11px monospace;color:#febc2e">bridge appliBridge > middleware > WSO2/REST vers le SI partenaire | EN: external system call via appliBridge</div>'}else if(isInt){h+='<div style="margin-top:6px;font:11px monospace;color:#febc2e">bridge appliBridge > operation interne du SI SGA | EN: internal system operation</div>'}else{h+='<div style="margin-top:6px">Dossier courant : '+(ref||'-')+'<br><a href="'+url+'" target="_blank" style="color:#E9041E">Ouvrir le dossier dans Jira</a></div>'}
 document.getElementById('detail').innerHTML=h})}catch(e){}}
 var stEl2=document.createElement('span');stEl2.id='st-inst';stEl2.style.cssText='font-size:11px;margin-left:8px;color:#6f6f78';stEl2.textContent='…';document.querySelector('.sub').appendChild(stEl2);
 var stEl=document.createElement('span');stEl.id='st-model';stEl.style.cssText='color:#febc2e;font-size:11px;margin-left:8px';stEl.textContent='\u23f3 en attente de migration \u2014 v\u00e9rification toutes les 5 s';document.querySelector('.sub').appendChild(stEl);
