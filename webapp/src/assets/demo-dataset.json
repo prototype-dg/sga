@@ -1,0 +1,1763 @@
+{
+ "generated": "2026-09-25",
+ "completed_status": "Dossier décaissé partiellement",
+ "partials": [
+  "Demande en étude",
+  "Attente décision",
+  "Attente infos Supp Décisionnaire",
+  "Attente AXA",
+  "Garanties reçues"
+ ],
+ "records": [
+  {
+   "ref": "OCP-2026-0001",
+   "demandeur": "DJAADI Tariq",
+   "produit": "Crédit Auto 48M",
+   "montant": 500000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0002",
+   "demandeur": "LOUNIS Omar",
+   "produit": "Crédit Auto 48M",
+   "montant": 150000,
+   "agence": "Annaba",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0003",
+   "demandeur": "KACIMI Rachid",
+   "produit": "Crédit Auto 36M",
+   "montant": 800000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0004",
+   "demandeur": "JEBBAR Rachid",
+   "produit": "Crédit Conso 24M",
+   "montant": 300000,
+   "agence": "Constantine",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0005",
+   "demandeur": "PERRIN Tariq",
+   "produit": "Crédit Auto 36M",
+   "montant": 300000,
+   "agence": "Annaba",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0006",
+   "demandeur": "KACIMI Meriem",
+   "produit": "Crédit Conso 24M",
+   "montant": 800000,
+   "agence": "Constantine",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0007",
+   "demandeur": "OUBELAID Celine",
+   "produit": "Crédit Personnel 18M",
+   "montant": 150000,
+   "agence": "Sétif",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0008",
+   "demandeur": "HADDAD Mehdi",
+   "produit": "Crédit Conso 48M",
+   "montant": 500000,
+   "agence": "Bab Ezzouar",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0009",
+   "demandeur": "GUEDDAR Nadia",
+   "produit": "Crédit Personnel 18M",
+   "montant": 500000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0010",
+   "demandeur": "BENSACI Sofiane",
+   "produit": "Crédit Conso 12M",
+   "montant": 500000,
+   "agence": "Sétif",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0011",
+   "demandeur": "YAHIAOUI Selma",
+   "produit": "Crédit Conso 36M",
+   "montant": 2500000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0012",
+   "demandeur": "FRANCESCHI Amina",
+   "produit": "Crédit Conso 12M",
+   "montant": 800000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0013",
+   "demandeur": "LARBI Leila",
+   "produit": "Crédit Personnel 18M",
+   "montant": 2000000,
+   "agence": "Constantine",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0014",
+   "demandeur": "ZERROUKI Hakim",
+   "produit": "Crédit Conso 24M",
+   "montant": 2000000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0015",
+   "demandeur": "IDRISSI Nawel",
+   "produit": "Crédit Conso 24M",
+   "montant": 2500000,
+   "agence": "Bab Ezzouar",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0016",
+   "demandeur": "BENSACI Djamal",
+   "produit": "Crédit Conso 24M",
+   "montant": 2500000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0017",
+   "demandeur": "AMRANI Samir",
+   "produit": "Crédit Conso 48M",
+   "montant": 2000000,
+   "agence": "Sétif",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0018",
+   "demandeur": "ZERROUKI Yacine",
+   "produit": "Crédit Conso 36M",
+   "montant": 500000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0019",
+   "demandeur": "OUBELAID Mehdi",
+   "produit": "Crédit Auto 48M",
+   "montant": 2000000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0020",
+   "demandeur": "PERRIN Riad",
+   "produit": "Crédit Conso 24M",
+   "montant": 1200000,
+   "agence": "Annaba",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0021",
+   "demandeur": "MANSOURI Yacine",
+   "produit": "Crédit Conso 48M",
+   "montant": 800000,
+   "agence": "Bab Ezzouar",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0022",
+   "demandeur": "LARBI Karim",
+   "produit": "Crédit Auto 48M",
+   "montant": 500000,
+   "agence": "Sétif",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0023",
+   "demandeur": "HAMDI Karim",
+   "produit": "Crédit Personnel 18M",
+   "montant": 150000,
+   "agence": "Sétif",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0024",
+   "demandeur": "SAADI Sofiane",
+   "produit": "Crédit Conso 36M",
+   "montant": 150000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0025",
+   "demandeur": "MEZIANE Lucie",
+   "produit": "Crédit Auto 48M",
+   "montant": 500000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0026",
+   "demandeur": "HERNANDEZ Sofiane",
+   "produit": "Crédit Auto 48M",
+   "montant": 800000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0027",
+   "demandeur": "NADIR Omar",
+   "produit": "Crédit Conso 24M",
+   "montant": 2000000,
+   "agence": "Constantine",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0028",
+   "demandeur": "KACIMI Samir",
+   "produit": "Crédit Auto 48M",
+   "montant": 1200000,
+   "agence": "Oran Es Senia",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0029",
+   "demandeur": "NOUIOUA Sofiane",
+   "produit": "Crédit Conso 36M",
+   "montant": 300000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0030",
+   "demandeur": "ISSAD Claire",
+   "produit": "Crédit Conso 12M",
+   "montant": 2500000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0031",
+   "demandeur": "DJAADI Omar",
+   "produit": "Crédit Auto 48M",
+   "montant": 300000,
+   "agence": "Sétif",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0032",
+   "demandeur": "DAHMANI Selma",
+   "produit": "Crédit Conso 12M",
+   "montant": 800000,
+   "agence": "Oran Es Senia",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0033",
+   "demandeur": "PERRIN Julien",
+   "produit": "Crédit Auto 36M",
+   "montant": 500000,
+   "agence": "Constantine",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0034",
+   "demandeur": "MOUSSA Nawel",
+   "produit": "Crédit Auto 48M",
+   "montant": 150000,
+   "agence": "Annaba",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0035",
+   "demandeur": "KACIMI Bruno",
+   "produit": "Crédit Conso 36M",
+   "montant": 2500000,
+   "agence": "Annaba",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0036",
+   "demandeur": "TALEB Lina",
+   "produit": "Crédit Conso 36M",
+   "montant": 800000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0037",
+   "demandeur": "FRANCESCHI Tariq",
+   "produit": "Crédit Auto 48M",
+   "montant": 2000000,
+   "agence": "Bab Ezzouar",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0038",
+   "demandeur": "ISSAD Bruno",
+   "produit": "Crédit Conso 24M",
+   "montant": 1200000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0039",
+   "demandeur": "RAHMANI Karima",
+   "produit": "Crédit Auto 48M",
+   "montant": 1200000,
+   "agence": "Constantine",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0040",
+   "demandeur": "JELASSI Omar",
+   "produit": "Crédit Conso 36M",
+   "montant": 2500000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0041",
+   "demandeur": "KACIMI Bruno",
+   "produit": "Crédit Auto 36M",
+   "montant": 150000,
+   "agence": "Constantine",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0042",
+   "demandeur": "SAADI Claire",
+   "produit": "Crédit Conso 12M",
+   "montant": 150000,
+   "agence": "Bab Ezzouar",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0043",
+   "demandeur": "RAHMANI Karim",
+   "produit": "Crédit Conso 12M",
+   "montant": 300000,
+   "agence": "Constantine",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0044",
+   "demandeur": "BENSACI Rachid",
+   "produit": "Crédit Auto 48M",
+   "montant": 800000,
+   "agence": "Sétif",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0045",
+   "demandeur": "GHALEM Bruno",
+   "produit": "Crédit Auto 36M",
+   "montant": 2500000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0046",
+   "demandeur": "FERHAT Nawel",
+   "produit": "Crédit Conso 48M",
+   "montant": 1200000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0047",
+   "demandeur": "NADIR Pierre",
+   "produit": "Crédit Personnel 18M",
+   "montant": 1200000,
+   "agence": "Oran Es Senia",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0048",
+   "demandeur": "KETTANI Marwan",
+   "produit": "Crédit Auto 36M",
+   "montant": 2500000,
+   "agence": "Annaba",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0049",
+   "demandeur": "JELASSI Mehdi",
+   "produit": "Crédit Conso 36M",
+   "montant": 800000,
+   "agence": "Annaba",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0050",
+   "demandeur": "ZERROUKI Julien",
+   "produit": "Crédit Auto 36M",
+   "montant": 800000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0051",
+   "demandeur": "MANSOURI Karim",
+   "produit": "Crédit Conso 12M",
+   "montant": 500000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0052",
+   "demandeur": "NOUIOUA Amina",
+   "produit": "Crédit Conso 24M",
+   "montant": 1200000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0053",
+   "demandeur": "MOUSSA Rachid",
+   "produit": "Crédit Auto 48M",
+   "montant": 2000000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0054",
+   "demandeur": "LOUNIS Rachid",
+   "produit": "Crédit Conso 12M",
+   "montant": 2500000,
+   "agence": "Bab Ezzouar",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0055",
+   "demandeur": "GHALEM Pierre",
+   "produit": "Crédit Conso 24M",
+   "montant": 500000,
+   "agence": "Annaba",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0056",
+   "demandeur": "HERNANDEZ Nadia",
+   "produit": "Crédit Auto 36M",
+   "montant": 300000,
+   "agence": "Annaba",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0057",
+   "demandeur": "MEZIANE Hakim",
+   "produit": "Crédit Conso 48M",
+   "montant": 300000,
+   "agence": "Sétif",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0058",
+   "demandeur": "GACEM Celine",
+   "produit": "Crédit Conso 48M",
+   "montant": 300000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0059",
+   "demandeur": "CHERIF Nawel",
+   "produit": "Crédit Conso 48M",
+   "montant": 500000,
+   "agence": "Oran Es Senia",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0060",
+   "demandeur": "CADI Julien",
+   "produit": "Crédit Personnel 18M",
+   "montant": 2000000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0061",
+   "demandeur": "CHERIF Sonia",
+   "produit": "Crédit Conso 48M",
+   "montant": 2000000,
+   "agence": "Bab Ezzouar",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0062",
+   "demandeur": "CHERIF Karim",
+   "produit": "Crédit Conso 24M",
+   "montant": 300000,
+   "agence": "Constantine",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0063",
+   "demandeur": "ELHADI Omar",
+   "produit": "Crédit Conso 48M",
+   "montant": 300000,
+   "agence": "Bab Ezzouar",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0064",
+   "demandeur": "FRANCESCHI Karim",
+   "produit": "Crédit Personnel 18M",
+   "montant": 150000,
+   "agence": "Oran Es Senia",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0065",
+   "demandeur": "LARBI Lina",
+   "produit": "Crédit Conso 12M",
+   "montant": 2000000,
+   "agence": "Constantine",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0066",
+   "demandeur": "MOUSSA Rachid",
+   "produit": "Crédit Personnel 18M",
+   "montant": 2500000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0067",
+   "demandeur": "HADDAD Meriem",
+   "produit": "Crédit Conso 48M",
+   "montant": 800000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0068",
+   "demandeur": "BOUDJEMA Lucie",
+   "produit": "Crédit Conso 12M",
+   "montant": 300000,
+   "agence": "Oran Es Senia",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0069",
+   "demandeur": "MOUSSA Sofiane",
+   "produit": "Crédit Conso 36M",
+   "montant": 2500000,
+   "agence": "Sétif",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0070",
+   "demandeur": "FRANCESCHI Leila",
+   "produit": "Crédit Conso 48M",
+   "montant": 2000000,
+   "agence": "Annaba",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0071",
+   "demandeur": "LARBI Nawel",
+   "produit": "Crédit Auto 48M",
+   "montant": 800000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0072",
+   "demandeur": "JELASSI Leila",
+   "produit": "Crédit Conso 24M",
+   "montant": 150000,
+   "agence": "Constantine",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0073",
+   "demandeur": "KACIMI Sonia",
+   "produit": "Crédit Auto 48M",
+   "montant": 500000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0074",
+   "demandeur": "HAMDI Hakim",
+   "produit": "Crédit Conso 48M",
+   "montant": 1200000,
+   "agence": "Sétif",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0075",
+   "demandeur": "JOUBRAN Yacine",
+   "produit": "Crédit Conso 12M",
+   "montant": 1200000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0076",
+   "demandeur": "IBRAHIM Rachid",
+   "produit": "Crédit Auto 36M",
+   "montant": 150000,
+   "agence": "Annaba",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0077",
+   "demandeur": "MANSOURI Sofiane",
+   "produit": "Crédit Conso 12M",
+   "montant": 1200000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0078",
+   "demandeur": "NOUIOUA Selma",
+   "produit": "Crédit Conso 12M",
+   "montant": 1200000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0079",
+   "demandeur": "CADI Nawel",
+   "produit": "Crédit Auto 36M",
+   "montant": 1200000,
+   "agence": "Constantine",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0080",
+   "demandeur": "SAADI Marwan",
+   "produit": "Crédit Conso 36M",
+   "montant": 300000,
+   "agence": "Annaba",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0081",
+   "demandeur": "SAADI Karim",
+   "produit": "Crédit Conso 36M",
+   "montant": 800000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0082",
+   "demandeur": "RAHMANI Julien",
+   "produit": "Crédit Conso 36M",
+   "montant": 2500000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0083",
+   "demandeur": "MOUSSA Julien",
+   "produit": "Crédit Auto 36M",
+   "montant": 1200000,
+   "agence": "Alger Centre",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0084",
+   "demandeur": "GHALEM Amina",
+   "produit": "Crédit Conso 24M",
+   "montant": 1200000,
+   "agence": "Bab Ezzouar",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0085",
+   "demandeur": "FERHAT Marwan",
+   "produit": "Crédit Conso 36M",
+   "montant": 150000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0086",
+   "demandeur": "ZERROUKI Leila",
+   "produit": "Crédit Conso 24M",
+   "montant": 800000,
+   "agence": "Sétif",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0087",
+   "demandeur": "KACIMI Mehdi",
+   "produit": "Crédit Conso 36M",
+   "montant": 1200000,
+   "agence": "Sétif",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0088",
+   "demandeur": "JOUBRAN Tariq",
+   "produit": "Crédit Auto 48M",
+   "montant": 2500000,
+   "agence": "Constantine",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0089",
+   "demandeur": "RAHMANI Marwan",
+   "produit": "Crédit Auto 48M",
+   "montant": 150000,
+   "agence": "Hydra",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0090",
+   "demandeur": "NADIR Lina",
+   "produit": "Crédit Conso 12M",
+   "montant": 2000000,
+   "agence": "Constantine",
+   "target": "Dossier décaissé partiellement",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues",
+    "Auto Garantie pré-validée",
+    "Auto Décaissement Manuel",
+    "Auto Décaissement Partielle"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0091",
+   "demandeur": "GUEDDAR Samir",
+   "produit": "Crédit Conso 36M",
+   "montant": 1200000,
+   "agence": "Hydra",
+   "target": "Demande en étude",
+   "path": [
+    "Compléter la demande"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0092",
+   "demandeur": "TALEB Nadia",
+   "produit": "Crédit Auto 48M",
+   "montant": 2000000,
+   "agence": "Sétif",
+   "target": "Attente décision",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0093",
+   "demandeur": "NADIR Pierre",
+   "produit": "Crédit Conso 48M",
+   "montant": 500000,
+   "agence": "Sétif",
+   "target": "Attente infos Supp Décisionnaire",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "Demander infos supp"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0094",
+   "demandeur": "HAMDI Rachid",
+   "produit": "Crédit Auto 48M",
+   "montant": 800000,
+   "agence": "Sétif",
+   "target": "Attente AXA",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "Attente retour AXA"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0095",
+   "demandeur": "OUBELAID Sonia",
+   "produit": "Crédit Conso 12M",
+   "montant": 500000,
+   "agence": "Sétif",
+   "target": "Garanties reçues",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0096",
+   "demandeur": "FERHAT Riad",
+   "produit": "Crédit Conso 36M",
+   "montant": 300000,
+   "agence": "Annaba",
+   "target": "Demande en étude",
+   "path": [
+    "Compléter la demande"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0097",
+   "demandeur": "ELHADI Amina",
+   "produit": "Crédit Auto 48M",
+   "montant": 800000,
+   "agence": "Constantine",
+   "target": "Attente décision",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0098",
+   "demandeur": "MOUSSA Lina",
+   "produit": "Crédit Conso 12M",
+   "montant": 2000000,
+   "agence": "Hydra",
+   "target": "Attente infos Supp Décisionnaire",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "Demander infos supp"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0099",
+   "demandeur": "KACIMI Sonia",
+   "produit": "Crédit Personnel 18M",
+   "montant": 500000,
+   "agence": "Constantine",
+   "target": "Attente AXA",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "Attente retour AXA"
+   ]
+  },
+  {
+   "ref": "OCP-2026-0100",
+   "demandeur": "LARBI Omar",
+   "produit": "Crédit Conso 48M",
+   "montant": 300000,
+   "agence": "Alger Centre",
+   "target": "Garanties reçues",
+   "path": [
+    "Compléter la demande",
+    "Soumettre pour décision",
+    "[APPLI] - Décision",
+    "[APPLI] - Constituer dossier - Demander garanties",
+    "Auto Garanties reçues"
+   ]
+  }
+ ]
+}

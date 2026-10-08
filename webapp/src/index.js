@@ -20,6 +20,7 @@ const { URL } = require('url');
 
 const ENV = process.env;
 const PORT = Number(ENV.PORT || ENV.MIDDLEWARE_PORT || 3000);
+const RING = [];
 const CFG = {
   planeUrl: ENV.PLANE_URL || 'http://plane-proxy:80',
   planeToken: ENV.PLANE_ADMIN_TOKEN || '',
@@ -33,10 +34,19 @@ const CFG = {
   systemActor: ENV.SYSTEM_MEMBER_ID || '00000000-0000-0000-0000-000000000001',
   planePublicUrl: ENV.PLANE_PUBLIC_URL || 'https://sga-plane.andersenlab.com',
   sourceProperty: 'source', // custom property used for loop-guard
+  jiraUrl: ENV.JIRA_URL || 'http://74.162.153.131:8080',
+  jiraUser: ENV.JIRA_USER || 'azurea',
+  jiraPass: ENV.JIRA_PASS || '',
+  jiraProject: ENV.JIRA_PROJECT || 'OCP',
+  jiraIssueType: ENV.JIRA_ISSUE_TYPE_ID || '10002',
+  agentUrl: ENV.AGENT_URL || 'https://sga-plane.andersenlab.com/agent',
+  agentToken: ENV.AGENT_TOKEN || '',
 };
 
 /* ---------------- tiny helpers ---------------- */
-function log(...a) { console.log(new Date().toISOString(), ...a); }
+function log(...a) {
+  RING.push('[' + new Date().toISOString() + '] ' + Array.from(arguments).map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join(' '));
+  if (RING.length > 200) RING.shift(); console.log(new Date().toISOString(), ...a); }
 function readBody(req, limit = 2 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
     const chunks = []; let size = 0;
@@ -105,6 +115,64 @@ async function flowableStartCase(defKey, vars) {
   });
 }
 
+/* ---------------- HTTP to Jira (DC 9.12.5) ---------------- */
+async function jiraApi(method, path, body) {
+  const u = new URL(CFG.jiraUrl + path);
+  const res = await fetch(u, {
+    method, headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Basic ' + Buffer.from(`${CFG.jiraUser}:${CFG.jiraPass}`).toString('base64'),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`JIRA ${method} ${path} -> ${res.status}: ${text.slice(0, 200)}`);
+  try { return JSON.parse(text); } catch { return text; }
+}
+async function flowableStartProcess(defKey, vars) {
+  return flowableApi('POST', '/service/runtime/process-instances', { processDefinitionKey: defKey, variables: Object.entries(vars).map(([name, value]) => ({ name, value })) });
+}
+let DEMO_DATASET = null;
+try { DEMO_DATASET = JSON.parse(fs.readFileSync(path.join(__dirname, 'assets', 'demo-dataset.json'), 'utf8')); log('demo dataset loaded:', (DEMO_DATASET.records || []).length, 'records'); } catch (e) { log('demo dataset NOT loaded:', e.message.slice(0, 100)); }
+async function agentRun(id) {
+  const r = await fetch(CFG.agentUrl + '/run', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Agent-Token': CFG.agentToken }, body: JSON.stringify({ id }) });
+  return r.json();
+}
+
+async function jiraWipeIssues() {
+  let del = 0, start = 0, guard = 0;
+  while (guard++ < 40) {
+    const sr = await jiraApi('POST', '/rest/api/2/search', { jql: `project = ${CFG.jiraProject}`, maxResults: 50, startAt: 0, fields: ['summary'] });
+    const iss = sr.issues || [];
+    if (!iss.length) break;
+    for (const it of iss) { try { await jiraApi('DELETE', `/rest/api/2/issue/${it.key}`); del++; } catch (e) { } }
+  }
+  return del;
+}
+async function jiraSeedDataset(job) {
+  const recs = (DEMO_DATASET && DEMO_DATASET.records) || [];
+  job.total = recs.length;
+  let ok = 0;
+  for (const rec of recs) {
+    let key = null;
+    try {
+      const ni = await jiraApi('POST', '/rest/api/2/issue', { fields: { project: { key: CFG.jiraProject }, summary: `Dossier ${rec.demandeur} - ${rec.ref}`, issuetype: { id: CFG.jiraIssueType }, description: `Demo dataset ${rec.ref} | ${rec.produit} | ${rec.montant} DZD | Agence ${rec.agence}` } });
+      key = ni.key;
+      for (const tname of (rec.path || [])) {
+        const tn = String(tname).replace('[common] ', '');
+        const trs = await jiraApi('GET', `/rest/api/2/issue/${key}/transitions`);
+        const ts = trs.transitions || [];
+        const hit = ts.find(t => t.name === tn) || ts.find(t => t.name && t.name.toLowerCase() === tn.toLowerCase());
+        if (!hit) throw new Error('transition not offered: ' + tn);
+        await jiraApi('POST', `/rest/api/2/issue/${key}/transitions`, { transition: { id: hit.id } });
+      }
+      rec.jira_key = key; ok++;
+    } catch (e) { job.errors.push(`${rec.ref}/${key || '?'}: ${e.message.slice(0, 120)}`); }
+    job.done++; job.phase = `re-seeding Jira ${job.done}/${job.total}`;
+  }
+  return ok;
+}
+
 /* ---------------- Mock external systems ---------------- */
 const mockDb = require('fs').existsSync('/app/data/clients.json') ? require('/app/data/clients.json') : require('./mock-data.json');
 const mocks = {
@@ -136,38 +204,34 @@ function routeMocks(pathname, method, body, u, res) {
 
 /* ---------------- Plane webhook handling ---------------- */
 const seen = new Map(); // idempotency
+function findWorkItem(node, depth) {
+  if (!node || typeof node !== 'object' || depth > 6) return null;
+  if (Array.isArray(node)) { for (let i = 0; i < node.length; i++) { const f = findWorkItem(node[i], depth + 1); if (f) return f; } return null; }
+  if (node.id && node.project_id && node.name !== undefined) return node;
+  for (const k of Object.keys(node)) { const f = findWorkItem(node[k], depth + 1); if (f) return f; }
+  return null;
+}
 async function handleWebhook(bodyBuf, signature) {
-  const expected = crypto.createHmac('sha256', CFG.webhookSecret).update(bodyBuf).digest('hex');
-  if (signature && signature !== expected) throw new Error('bad signature');
-  const evt = JSON.parse(bodyBuf.toString('utf8'));
-  const { event, payload } = evt;
-  const actor = evt.actor || payload.actor || '';
-  if (actor === CFG.systemActor) { log('loop-guard: system write ignored'); return { skipped: 'system' }; }
-  const dedupe = evt.event_id || evt.delivery_id || (event + ':' + (payload.work_item_id || ''));
-  if (seen.has(dedupe)) { log('dedupe hit', dedupe); return { skipped: 'duplicate' }; }
-  seen.set(dedupe, Date.now()); if (seen.size > 5000) seen.clear();
-  log('webhook event', event);
-  if (event === 'workitem.created') {
-    const wi = payload.work_item || {};
-    const project = wi.project_id;
-    const title = wi.name || wi.title || 'Dossier';
-    const flat = JSON.parse(JSON.stringify(wi, (k, v) => typeof v === 'object' && v !== null ? undefined : v));
-    if ((CFG.planeCreditProject && project === CFG.planeCreditProject) || /ocr|credit|dossier/i.test(title)) {
-      let ci = { id: 'n/a' };
-      try { ci = await flowableStartProcess('OCP_case', { dossier: title, montant: flat.montant_demande || 0, workItemId: wi.id, projectId: project, actor }); } catch (e) { log('flowable unavailable, continuing:', e.message); }
-      const sid = await planeFirstStateId(project, 'Demande en etude');
-      if (sid) await planeSetState(wi.id, sid, project).catch(e => log('write-back state warn', e.message));
-      await planeComment(wi.id, project, `Dossier ouvert par le moteur (réf. Flowable <i>${ci.id}</i>) — comportement « post-fonction » natif.`);
-      return { ok: true, caseId: ci.id };
-    }
-    return { ok: true, note: 'not a credit dossier' };
-  }
-  if (event === 'workitem.updated') {
-    const wi = payload.work_item || {};
-    log('workitem updated', wi.id, wi.state);
-    return { ok: true };
-  }
-  return { ok: true, note: 'event not handled' };
+  let body = {};
+  try { body = JSON.parse(bodyBuf.toString('utf8') || '{}'); } catch (e) { return { error: 'bad json' }; }
+  const expected = crypto.createHmac('sha256', ENV.PLANE_WEBHOOK_SECRET || 'demo-secret-change-me').update(bodyBuf).digest('hex');
+  if (signature && signature !== expected) { log('webhook bad signature'); return { error: 'bad signature' }; }
+  let ev = body.event || body.event_type || '';
+  if (ev === 'issue' && body.action) ev = 'workitem.' + (body.action === 'create' ? 'created' : body.action === 'update' ? 'updated' : body.action === 'delete' ? 'deleted' : body.action);
+  log('webhook event', ev);
+  if (ev !== 'workitem.created') return { skipped: 'event ' + ev };
+  const wi = findWorkItem(body, 0);
+  if (!wi) { log('webhook skip: aucun work item dans le payload (keys=' + Object.keys(body).join(',') + ')'); return { skipped: 'no work item in payload' }; }
+  if (!wi.id || !wi.project_id) { log('webhook skip: work item partiel (keys=' + Object.keys(wi).join(',') + ')'); return { skipped: 'no work item in payload' }; }
+  log('webhook work item', String(wi.name || wi.id));
+  if (String(wi.project_id) !== String(CFG.planeCreditProject)) { log('webhook skip: autre projet', String(wi.project_id)); return { skipped: 'other project' }; }
+  let ci = null;
+  try {
+    ci = await flowableStartProcess('OCP_case', { dossierId: String(wi.id), dossierName: String(wi.name || ''), stateId: String(wi.state_id || '') });
+    log('flowable case started', ci.id);
+  } catch (e) { log('flowable start failed', e.message.slice(0, 160)); }
+  try { await planeComment(wi.id, wi.project_id, `Dossier ouvert par le moteur (réf. Flowable <i>${ci ? ci.id : 'n/a'}</i>) — comportement « post-fonction » natif.`); } catch (e) { log('comment warn', e.message.slice(0, 120)); }
+  return { ok: true, caseId: ci ? ci.id : null };
 }
 
 /* ---------------- REST ingestion (mobile app / API) ---------------- */
@@ -187,25 +251,150 @@ async function ingestDossier(body) {
 }
 
 /* ---------------- Reset demo data ---------------- */
-async function resetDemoData() {
-  const out = { deletedWorkItems: 0, deletedCases: 0, deletedProcesses: 0, errors: [] };
+/* ---------------- Reset demo data (Plane + Flowable + Jira) ---------------- */
+function execPage() {
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>SGA — Terminal opérateur</title><style>
+*{box-sizing:border-box;margin:0}body{background:#14141a;color:#e8e6e1;font-family:'Montserrat',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:28px 16px}
+.wrap{width:100%;max-width:900px}h1{font-size:20px;color:#fff;display:flex;align-items:center;gap:10px}h1 .dot{width:10px;height:10px;border-radius:50%;background:#E9041E;display:inline-block}
+.sub{color:#9a9a9a;font-size:12.5px;margin:6px 0 18px}.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.chip{background:#23232c;border:1px solid #3a3a44;color:#e8e6e1;font-size:11.5px;padding:7px 11px;border-radius:6px;cursor:pointer;font-family:inherit}.chip:hover{border-color:#E9041E;color:#fff}.chip.on{background:#E9041E;border-color:#E9041E;color:#fff}
+.term{background:#0c0c10;border:1px solid #2a2a33;border-radius:10px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.bar{background:#1b1b22;padding:8px 12px;display:flex;gap:6px;align-items:center}.bar i{width:11px;height:11px;border-radius:50%;display:inline-block}.bar i:nth-child(1){background:#ff5f57}.bar i:nth-child(2){background:#febc2e}.bar i:nth-child(3){background:#28c840}.bar span{margin-left:8px;color:#8a8a8a;font-size:11px}
+.out{padding:14px;font:12.5px/1.55 'SF Mono','Fira Code',Consolas,monospace;height:420px;overflow-y:auto;white-space:pre-wrap;word-break:break-word}
+.cmd{color:#28c840}.err{color:#ff6b6b}.dim{color:#6f6f78}.exit{color:#febc2e}
+.inrow{display:flex;gap:8px;padding:12px;border-top:1px solid #2a2a33;background:#101016}
+.prompt{color:#E9041E;font:12.5px 'SF Mono',monospace;padding:9px 0;white-space:nowrap}
+input{flex:1;background:#0c0c10;border:1px solid #2a2a33;color:#e8e6e1;font:12.5px 'SF Mono',monospace;padding:8px 10px;border-radius:6px;outline:none}input:focus{border-color:#E9041E}
+button{background:#E9041E;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-family:inherit;font-weight:600;cursor:pointer}button:disabled{opacity:.5}
+.note{color:#6f6f78;font-size:11px;margin-top:12px}</style></head><body><div class="wrap">
+<h1><span class="dot"></span>SGA Demo Stand — Terminal opérateur</h1>
+<div class="sub">Exécute les commandes opérateur sur la VM (liste blanche, token-gated) — équivalent web du runbook SSH.</div>
+<div class="chips" id="chips"></div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><span>operator@sga-demo-stack — zsh</span></div>
+<div class="out" id="out"><span class="dim">SGA operator shell — choisissez une commande puis Entrée. Les imports complètent en 30–90 s.</span>
+</div><div class="inrow"><span class="prompt">operator@sga:~$</span><input id="inp" placeholder="id de commande (ex: jira-dry)" spellcheck="false"/><button id="run">Run</button></div></div>
+<div class="note">Commandes admises : workflow-migrate · jira-dry · jira-import · jira-import-wipe (les trois intègrent la migration du workflow) · docker-ps · flowable-instances · jira-count · plane-count — tout autre id est refusé par l'agent.</div>
+</div><script>
+var CMDS={'workflow-migrate':'python3 workflow_convert.py — lit le XML du workflow Jira (34 étapes, 122 transitions) et déploie le BPMN converti dans Flowable','jira-dry':'docker exec -w /code sga-api-1 python manage.py jira_import --jira-url http://74.162.153.131:8080 --pat *** --jira-project OCP --plane-project 7843…7c5 --dry-run','jira-import':'docker exec -w /code sga-api-1 python manage.py jira_import --jira-url … --pat *** --jira-project OCP --plane-project 7843…7c5','jira-import-wipe':'workflow-migrate + jira_import --wipe-all (migre le workflow PUIS remplace le contenu du projet)','docker-ps':'docker ps --format {{.Names}}\\t{{.Status}}','flowable-instances':"curl -u rest-admin:test http://localhost:8081/flowable-rest/service/runtime/process-instances",'jira-count':"curl -u azurea:*** http://74.162.153.131:8080/rest/api/2/search?jql=project=OCP",'plane-count':'psql: SELECT state, count(*) FROM issues GROUP BY state'};
+var out=document.getElementById('out'),inp=document.getElementById('inp'),btn=document.getElementById('run'),chips=document.getElementById('chips');
+Object.keys(CMDS).forEach(function(id){var b=document.createElement('button');b.className='chip';b.textContent=id;b.title=CMDS[id];b.onclick=function(){inp.value=id;[].forEach.call(document.querySelectorAll('.chip'),function(c){c.classList.remove('on')});b.classList.add('on')};chips.appendChild(b)});
+function line(txt,cls){var s=document.createElement('span');if(cls)s.className=cls;s.textContent=txt+String.fromCharCode(10);out.appendChild(s);out.scrollTop=out.scrollHeight;return s}
+inp.addEventListener('keydown',function(e){if(e.key==='Enter')go()});
+btn.onclick=go;
+function go(){var id=inp.value.trim();if(!id)return;if(!CMDS[id]){line('[agent] commande inconnue: '+id+' (liste blanche refusée)','err');return}
+line('operator@sga:~$ '+CMDS[id],'cmd');btn.disabled=true;btn.textContent='…';
+fetch('/admin/exec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json()}).then(function(d){
+ if(d.stdout)line(d.stdout.trim());if(d.stderr)line('[stderr] '+d.stderr.trim(),'err');
+ line('[exit '+(d.exit!==undefined?d.exit:'?')+']','exit');
+}).catch(function(e){line('[fetch error] '+e,'err')}).finally(function(){btn.disabled=false;btn.textContent='Run'})}
+</script></body></html>`;
+}
+
+function inspectorPage() {
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>SGA — Process Inspector</title>
+<script src="/assets/bpmn-viewer.js"></script>
+<style>
+*{box-sizing:border-box;margin:0}body{background:#14141a;color:#e8e6e1;font-family:'Montserrat',system-ui,sans-serif;padding:20px}
+h1{font-size:19px;color:#fff;display:flex;gap:10px;align-items:center}.dot{width:10px;height:10px;border-radius:50%;background:#E9041E}
+.sub{color:#9a9a9a;font-size:12px;margin:6px 0 16px}
+.grid{display:grid;grid-template-columns:1fr 340px;gap:14px}
+.panel{background:#1b1b22;border:1px solid #2a2a33;border-radius:10px;padding:12px;overflow:hidden}
+.panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#E9041E;margin-bottom:8px}
+#canvas{height:480px;background:#0c0c10;border-radius:8px}
+#canvas .bjs-powered-by{display:none}
+.tl{max-height:210px;overflow-y:auto;font-size:12px;line-height:1.7}
+.tl .t{padding:3px 8px;border-left:2px solid #3a3a44;margin-bottom:2px}
+.tl .t.done{border-color:#28c840;color:#cfcfcf}.tl .t.act{border-color:#E9041E;color:#fff;background:rgba(233,4,30,.12);font-weight:600}
+.vars{font-size:12px;line-height:1.8}.vars b{color:#febc2e}
+.log{font:11px/1.5 'SF Mono',Consolas,monospace;color:#9fd6a0;max-height:200px;overflow-y:auto;white-space:pre-wrap}
+select{background:#0c0c10;color:#e8e6e1;border:1px solid #2a2a33;border-radius:6px;padding:6px 8px;font-family:inherit;width:100%}
+.btn{background:#E9041E;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-family:inherit;font-weight:600;cursor:pointer;margin-top:8px}
+.empty{color:#6f6f78;font-size:12px}
+@keyframes pulse{0%,100%{fill-opacity:.55}50%{fill-opacity:.15}}
+.bjs-active rect{fill:#E9041E !important;fill-opacity:.4 !important;animation:pulse 1.6s infinite}
+.bjs-done rect{fill:#28c840 !important;fill-opacity:.28 !important}
+.bjs-done circle{fill:#28c840 !important;fill-opacity:.28 !important}
+.bjs-active circle{fill:#E9041E !important;fill-opacity:.4 !important}
+</style></head><body>
+<h1><span class="dot"></span>SGA Process Inspector — Octroi de Crédit</h1>
+<div class="sub">Ce qui se passe DERRIÈRE chaque action : moteur Flowable en direct — étape courante du processus, historique d'exécution, variables du dossier, journal d'appels de la couche d'intégration.</div>
+<div class="grid"><div class="panel"><h2>Processus (BPMN)</h2><div id="canvas"></div></div>
+<div><div class="panel"><h2>Dossiers en cours (Flowable)</h2><select id="inst"><option value="">— chargement…</option></select><button class="btn" onclick="load()">Inspecter</button></div>
+<div class="panel" style="margin-top:12px"><h2>Étapes du parcours</h2><div class="tl" id="tl"><span class="empty">Choisissez un dossier puis « Inspecter ».</span></div></div>
+<div class="panel" style="margin-top:12px"><h2>Variables du dossier</h2><div class="vars" id="vars"><span class="empty">—</span></div></div></div></div>
+<div class="panel" style="margin-top:12px"><h2>Journal de la couche d'intégration (temps réel)</h2><div class="log" id="log">…</div></div>
+<script>
+var viewer=null;
+function showErr(m){var c=document.getElementById('canvas');if(c)c.innerHTML='<div style="color:#ff6b6b;font:12px monospace;padding:14px">BPMN : '+String(m).replace(/</g,'&lt;')+'</div>'}
+fetch('/inspector/api/model').then(function(r){return r.text()}).then(function(x){
+  try{
+    viewer=new BpmnJS({container:'#canvas'});
+    viewer.importXML(x).then(function(){
+      try{viewer.get('canvas').zoom('fit-viewport')}catch(e){}
+      var n=(x.match(/BPMNShape/g)||[]).length;
+      if(!n)showErr('modele sans section BPMNDiagram (DI) - regenerer le modele converti');
+    }).catch(function(e){showErr('importXML: '+(e&&e.message?e.message:e))});
+  }catch(e){showErr('init viewer: '+String(e))}
+}).catch(function(e){showErr('chargement du modele: '+e)});
+fetch('/inspector/api/instances').then(function(r){return r.json()}).then(function(d){var sel=document.getElementById('inst');sel.innerHTML='';(d.data||[]).forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=(p.processDefinitionName||p.processDefinitionKey)+' — '+p.id.slice(0,8);sel.appendChild(o)});if(!(d.data||[]).length){sel.innerHTML='<option value="">aucun processus actif</option>'}});
+function load(){var id=document.getElementById('inst').value;if(!id)return;
+fetch('/inspector/api/instance/'+id).then(function(r){return r.json()}).then(function(d){
+ var tl=document.getElementById('tl');tl.innerHTML='';
+ (d.activities||[]).forEach(function(a){var e=document.createElement('div');e.className='t '+(a.end? 'done':'act');e.textContent=(a.end?'✓ ':'▶ ')+(a.name||a.activityId||'?')+'  '+(a.start? a.start.slice(11,19):'');tl.appendChild(e);
+  try{viewer.get('canvas').addMarker(a.activityId,a.end?'bjs-done':'bjs-active')}catch(e){}});
+ var vs='';Object.keys(d.variables||{}).forEach(function(k){vs+='<div><b>'+k+'</b> : '+(d.variables[k]&&d.variables[k].value!==undefined?d.variables[k].value:d.variables[k])+'</div>'});
+ document.getElementById('vars').innerHTML=vs||'<span class="empty">—</span>';});}
+setInterval(function(){fetch('/inspector/api/log').then(function(r){return r.text()}).then(function(t){document.getElementById('log').textContent=t.slice(-3000)})},3000);
+</script></body></html>`;
+}
+
+async function resetPlaneOnly() {
+  const out = { deletedWorkItems: 0, errors: [] };
   const projects = [CFG.planeCreditProject, CFG.planeRfcProject].filter(Boolean);
   for (const pid of projects) {
     try {
-      let after = null; let guard = 0;
-      while (guard++ < 50) {
-        const page = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${pid}/work-items/?per_page=100${after ? `&cursor=${after}` : ''}`);
+      let guard = 0;
+      while (guard++ < 60) {
+        const page = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${pid}/work-items/?per_page=100`);
         const items = (page.results || page || []);
         if (!Array.isArray(items) || items.length === 0) break;
         for (const wi of items) {
           try { await planeApi('DELETE', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${pid}/work-items/${wi.id}/`); out.deletedWorkItems++; }
           catch (e) { out.errors.push(`workitem ${wi.id}: ${e.message.slice(0, 120)}`); }
         }
-        after = page.next_cursor || null;
-        if (!after || page.next_page_results === false) break;
+        await new Promise(r2 => setTimeout(r2, 300));
       }
     } catch (e) { out.errors.push(`project ${pid}: ${e.message.slice(0, 160)}`); }
   }
+  return out;
+}
+async function planeSeedDemo() {
+  const recs = ((DEMO_DATASET && DEMO_DATASET.records) || []).slice(0, 10);
+  let n = 0;
+  if (!CFG.planeCreditProject) return n;
+  for (const rec of recs) {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        await planeCreateWorkItem(CFG.planeCreditProject, {
+          name: `Dossier ${rec.demandeur}`,
+          description_html: `<p>Dossier de crédit (seed démo) ${rec.ref} — ${rec.produit}, ${rec.montant} DZD, agence ${rec.agence}.</p>`,
+          work_item_type: 'dossier-credit',
+          properties: { ref: rec.ref, montant: rec.montant, agence: rec.agence },
+        });
+        n++;
+        break;
+      } catch (e) {
+        if (/429|throttl|rate/i.test(e.message) && attempt < 3) { await new Promise(r2 => setTimeout(r2, 30000)); continue; }
+        resetJob.errors.push('plane seed ' + rec.ref + ': ' + e.message.slice(0, 100));
+        break;
+      }
+    }
+    await new Promise(r2 => setTimeout(r2, 1200));
+  }
+  return n;
+}
+async function resetFlowableOnly() {
+  const out = { deletedProcesses: 0, errors: [] };
   try {
     const procs = await flowableApi('GET', '/service/runtime/process-instances?size=100');
     for (const p of (procs.data || [])) {
@@ -213,28 +402,101 @@ async function resetDemoData() {
       catch (e) { out.errors.push(`proc ${p.id}: ${e.message.slice(0, 120)}`); }
     }
   } catch (e) { out.errors.push(`processes list: ${e.message.slice(0, 160)}`); }
-  log('reset done', JSON.stringify(out));
   return out;
+}
+const resetJob = { running: false, startedAt: null, finishedAt: null, phase: 'idle', done: 0, total: 0, errors: [], result: null };
+function jobSnap() {
+  return { running: resetJob.running, phase: resetJob.phase, done: resetJob.done, total: resetJob.total, errors: resetJob.errors.slice(0, 5), result: resetJob.result, startedAt: resetJob.startedAt, finishedAt: resetJob.finishedAt };
+}
+async function runResetJob() {
+  resetJob.running = true; resetJob.startedAt = Date.now(); resetJob.finishedAt = null; resetJob.done = 0; resetJob.total = 0; resetJob.errors = []; resetJob.result = null; resetJob.phase = 'wiping Plane';
+  try {
+    const planePart = await resetPlaneOnly();
+    resetJob.phase = 'wiping Flowable';
+    const flowPart = await resetFlowableOnly();
+    resetJob.phase = 'seeding Plane';
+    const planeSeeded = await planeSeedDemo();
+    resetJob.phase = 'wiping Jira';
+    const jdel = CFG.jiraPass ? await jiraWipeIssues() : 0;
+    resetJob.phase = 're-seeding Jira dataset';
+    const seeded = CFG.jiraPass ? await jiraSeedDataset(resetJob) : 0;
+    resetJob.result = { ...planePart, planeSeeded, deletedProcesses: flowPart.deletedProcesses, jiraDeleted: jdel, jiraSeeded: seeded };
+  } catch (e) { resetJob.errors.push('fatal: ' + e.message.slice(0, 200)); }
+  resetJob.phase = resetJob.errors.length ? 'error' : 'done';
+  resetJob.running = false; resetJob.finishedAt = Date.now();
+  log('reset job finished', resetJob.phase);
+}
+
+/* ---------------- Jira -> Plane migration bridge ---------------- */
+function nkey(s) { return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
+const migJob = { running: false, startedAt: null, finishedAt: null, phase: 'idle', done: 0, total: 0, errors: [], result: null };
+function migSnap() {
+  return { running: migJob.running, phase: migJob.phase, done: migJob.done, total: migJob.total, errors: migJob.errors.slice(0, 5), result: migJob.result, startedAt: migJob.startedAt, finishedAt: migJob.finishedAt };
+}
+async function runMigrationJob() {
+  migJob.running = true; migJob.startedAt = Date.now(); migJob.finishedAt = null; migJob.done = 0; migJob.total = 0; migJob.errors = []; migJob.result = null; migJob.phase = 'reading Jira';
+  try {
+    const sr = await jiraApi('POST', '/rest/api/2/search', { jql: `project = ${CFG.jiraProject}`, maxResults: 100, fields: ['summary', 'status', 'description'] });
+    const issues = sr.issues || [];
+    migJob.total = issues.length;
+    let states = [];
+    try { const sp = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/states/`); states = sp.results || sp || []; } catch (e) { migJob.errors.push('states: ' + e.message.slice(0, 100)); }
+    const smap = {};
+    for (const st of states) if (st && st.name && st.id) smap[nkey(st.name)] = st.id;
+    migJob.phase = 'wiping Plane OCR';
+    try {
+      const prior = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/work-items/?per_page=100`);
+      for (const wi of (prior.results || prior || [])) { try { await planeApi('DELETE', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/work-items/${wi.id}/`); } catch (e) { } }
+    } catch (e) { migJob.errors.push('wipe: ' + e.message.slice(0, 100)); }
+    let ok = 0, mapped = 0;
+    for (const it of issues) {
+      const f = it.fields || {};
+      const stName = f.status && f.status.name;
+      const sid = smap[nkey(stName)];
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const desc = String(f.description || '').slice(0, 400).replace(/[<>]/g, ' ');
+          const wi = await planeCreateWorkItem(CFG.planeCreditProject, { name: f.summary || ('Dossier ' + it.key), description_html: `<p>${desc}</p><p><i>Migré depuis Jira ${it.key} — statut source : ${stName || '?'}</i></p>`, work_item_type: 'dossier-credit', properties: { jira_key: it.key, jira_status: stName || null } });
+          if (sid) { try { await planeSetState(wi.id, sid, CFG.planeCreditProject); mapped++; } catch (e) { } }
+          ok++; break;
+        } catch (e) {
+          if (/429|throttl|rate/i.test(e.message) && attempt < 2) { await new Promise(r => setTimeout(r, 30000)); continue; }
+          migJob.errors.push(it.key + ': ' + e.message.slice(0, 120)); break;
+        }
+      }
+      migJob.done++; migJob.phase = `migrating ${migJob.done}/${migJob.total}`;
+      await new Promise(r => setTimeout(r, 400));
+    }
+    migJob.result = { migrated: ok, stateMapped: mapped, jiraTotal: issues.length, statesAvailable: states.map(x => x.name).slice(0, 15) };
+  } catch (e) { migJob.errors.push('fatal: ' + e.message.slice(0, 200)); }
+  migJob.phase = migJob.errors.length ? 'error' : 'done';
+  migJob.running = false; migJob.finishedAt = Date.now();
+  log('migration job finished', migJob.phase);
 }
 
 /* ---------------- Live status ---------------- */
 async function liveStatus() {
-  const st = { middleware: 'ok', plane: 'down', flowable: 'down', workItems: null };
+  const st = { middleware: 'ok', plane: 'down', flowable: 'down', jira: 'skipped', workItems: null, jiraIssues: null };
   try {
     const page = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/work-items/?per_page=1`);
     st.plane = 'ok'; st.workItems = page.total_results != null ? page.total_results : ((page.results || []).length);
   } catch (e) { st.plane = 'down: ' + e.message.slice(0, 80); }
   try { await flowableApi('GET', '/service/management/engine'); st.flowable = 'ok'; } catch (e) { st.flowable = 'down: ' + e.message.slice(0, 80); }
+  if (CFG.jiraPass) {
+    try { const sr = await jiraApi('POST', '/rest/api/2/search', { jql: `project = ${CFG.jiraProject}`, maxResults: 0 }); st.jira = 'ok'; st.jiraIssues = sr.total; } catch (e) { st.jira = 'down: ' + e.message.slice(0, 80); }
+  }
   return st;
 }
 
 /* ---------------- Static assets ---------------- */
 const ASSETS = path.join(__dirname, 'assets');
+const ASSET_MIME = { '.svg': 'image/svg+xml', '.png': 'image/png', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.bpmn': 'application/xml; charset=utf-8' };
 function serveAsset(res, name) {
   const file = path.join(ASSETS, path.basename(name));
   if (!fs.existsSync(file)) return json(res, 404, { error: 'asset not found' });
   const b = fs.readFileSync(file);
-  res.writeHead(200, { 'content-type': name.endsWith('.svg') ? 'image/svg+xml' : 'image/png', 'cache-control': 'public, max-age=3600', 'content-length': b.length });
+  const ext = name.slice(name.lastIndexOf('.'));
+  res.writeHead(200, { 'content-type': ASSET_MIME[ext] || 'application/octet-stream', 'cache-control': 'public, max-age=3600', 'content-length': b.length });
   res.end(b);
 }
 
@@ -290,23 +552,27 @@ footer{border-top:1px solid var(--line);background:#fff;padding:18px 24px;text-a
 <div class="hero"><div class="in"><div class="rule"></div><h1>Octroi de Crédit &amp; RFC on Flowable + Plane</h1>
 <p>A working replica of the SGA credit-origination journey — mobile submission, insurance round-trip, DMN scoring, credit committee, execution — running live. All data is fictional.</p></div></div>
 <div class="wrap">
-<div class="status" id="status">${badge('Middleware', st.middleware)}${badge('Plane', st.plane === 'ok' ? 'ok' : st.plane)}${badge('Flowable', st.flowable === 'ok' ? 'ok' : st.flowable)}${st.workItems != null ? `<div class="badge"><span class="dot" style="background:#888"></span>OCR dossiers: ${st.workItems}</div>` : ''}</div>
+<div class="status" id="status">${badge('Middleware', st.middleware)}${badge('Plane', st.plane === 'ok' ? 'ok' : st.plane)}${badge('Flowable', st.flowable === 'ok' ? 'ok' : st.flowable)}${st.workItems != null ? `<div class="badge"><span class="dot" style="background:#888"></span>OCR dossiers: ${st.workItems}</div>` : ''}${CFG.jiraPass ? badge('Jira DC', st.jira === 'ok' ? 'ok' : st.jira) : ''}${CFG.jiraPass && st.jiraIssues != null ? `<div class="badge"><span class="dot" style="background:#888"></span>Jira dossiers: ${st.jiraIssues}</div>` : ''}</div>
 <div class="grid">
   <div class="card"><span class="eyebrow">Step 1 — The story starts</span><h2>APPLI SGA — mobile simulator</h2><p>Submit a credit application the way a bank customer would, from a phone. The dossier is created in Plane in real time — zero human input on the tool side.</p><a class="btn" href="/mobile">Open the app simulator</a></div>
   <div class="card"><span class="eyebrow">Step 2 — Follow the journey</span><h2>Plane — work tracking</h2><p>The OCR board carries the dossier through the real workflow states; the RFC project shows the same engine carrying IT change requests.</p><a class="btn" href="${CFG.planePublicUrl}">Open Plane</a><span class="meta">Sign-in: d.gibert@andersenlab.com / DemoAdmin123! (change after first login)</span></div>
+  <div class="card"><span class="eyebrow">Before migration — the legacy state</span><h2>Jira DC — l'existant à répliquer</h2><p>Réplica Jira Data Center du workflow Octroi de Crédit : 34 étapes, transitions [APPLI], script SIL — et le jeu de démonstration de 100 dossiers (90 % traités, 10 % en cours). C'est cette instance qui sera migrée vers Plane pendant la démo.</p><a class="btn" href="${CFG.jiraUrl}" target="_blank">Open Jira</a></div>
+  <div class="card"><span class="eyebrow">Sous le capot</span><h2>Process Inspector</h2><p>La visualisation Flowable en direct : l'étape courante du processus en rouge sur le modèle BPMN, l'historique d'exécution, les variables du dossier et le journal des appels — ce qui se passe derrière chaque action.</p><a class="btn" href="/inspector">Ouvrir l'inspecteur</a></div>
+  <div class="card"><span class="eyebrow">Operator</span><h2>Terminal web</h2><p>Les commandes opérateur du runbook — import Jira → Plane, état des conteneurs, comptages — exécutables depuis le navigateur, en liste blanche sécurisée.</p><a class="btn" href="/terminal">Ouvrir le terminal</a></div>
   <div class="card"><span class="eyebrow">Under the hood</span><h2>Integration layer &amp; mocks</h2><p>This site is the middleware itself: ingestion API, signed webhooks, Flowable client, and mocked externals — AXA, Active Directory, customer DB, SMS, doc generator.</p><a class="btn ghost" href="/healthz">healthz</a>&nbsp;<a class="btn ghost" href="/mock/db/client/CLT-10042">mock DB example</a></div>
   <div class="card"><span class="eyebrow">Standards, not scripts</span><h2>Process models (GitHub)</h2><p>The CMMN case, DMN scoring table and RFC BPMN process that execute the demo — readable by business, versioned by Git.</p><a class="btn ghost" href="https://github.com/prototype-dg/sga/blob/main/models/ocp/OCP_case.cmmn">OCP_case.cmmn</a>&nbsp;<a class="btn ghost" href="https://github.com/prototype-dg/sga/blob/main/models/ocp/scoring.dmn">scoring.dmn</a>&nbsp;<a class="btn ghost" href="https://github.com/prototype-dg/sga/blob/main/models/rfc/RFC_process.bpmn">RFC_process.bpmn</a></div>
   <div class="card"><span class="eyebrow">Reference</span><h2>Architecture dossier (PDF)</h2><p>The 19-page walkthrough delivered ahead of this demo: architecture, scenario mapping, migration economics.</p><a class="btn ghost" href="https://www.genspark.ai/api/files/s/DxrWQRCd">Open the dossier</a></div>
-  <div class="card danger"><span class="eyebrow">Operator only</span><h2>Reset demo data</h2><p>Removes every work item and comment from both Plane projects and cascade-deletes all Flowable cases and processes. Projects, states, models and mocks are kept — the stand returns to its initial state.</p><button class="btn" onclick="askReset()">Reset demo data</button><div id="resetOut"></div></div>
+  <div class="card danger"><span class="eyebrow">Operator only</span><h2>Reset demo data</h2><p>Wipes Plane work items, Flowable processes and every Jira issue in the OCP project — then re-seeds the full 100-dossier demo dataset (90% completed / 10% in progress) in Jira and the Plane seed dossiers. Runs as a background job — allow 5–10 min. Projects, states, models and mocks are kept.</p><button class="btn" onclick="askReset()">Reset demo data</button><div id="resetOut"></div></div>
 </div></div>
-<div class="modal" id="modal"><div class="box"><h3>Reset all demo data?</h3><p>This deletes <b>every work item</b> in <i>Octroi de Credit</i> and <i>RFC</i>, and all Flowable cases/processes. There is no undo — but everything can be replayed by re-running the demo.</p><div class="row"><button class="btn ghost" style="background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 18px;font-family:Montserrat;font-weight:700" onclick="closeModal()">Cancel</button><button class="btn" onclick="doReset()">Yes, reset everything</button></div></div></div>
+<div class="modal" id="modal"><div class="box"><h3>Reset all demo data?</h3><p>This deletes <b>every work item</b> in <i>Octroi de Credit</i> and <i>RFC</i>, all Flowable processes and <b>every Jira issue</b> — then re-seeds the 100-dossier demo dataset (90/10). Runs in the background, allow 5–10 min.</p><div class="row"><button class="btn ghost" style="background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 18px;font-family:Montserrat;font-weight:700" onclick="closeModal()">Cancel</button><button class="btn" onclick="doReset()">Yes, reset everything</button></div></div></div>
 <footer>Société Générale Algérie — internal demonstration environment. Every record, client and document shown here is fictional (mock).</footer>
 <script>
 function askReset(){document.getElementById('modal').classList.add('on')}
 function closeModal(){document.getElementById('modal').classList.remove('on')}
-async function doReset(){const b=document.getElementById('resetOut');b.style.display='block';b.textContent='Resetting…';
- try{const r=await fetch('/admin/reset',{method:'POST'});const j=await r.json();b.textContent='Done. '+JSON.stringify(j,null,1);setTimeout(()=>location.reload(),2500)}
- catch(e){b.textContent='Reset failed: '+e}}
+async function doReset(){closeModal();const b=document.getElementById('resetOut');b.style.display='block';b.textContent='Reset started — wiping Plane, Flowable and Jira, then re-seeding the 100-dossier dataset (5–10 min)…';
+ try{const r=await fetch('/admin/reset',{method:'POST'});if(r.status===409)b.textContent='A reset is already running…';
+  const poll=setInterval(async()=>{try{const s=await(await fetch('/admin/reset/status')).json();b.textContent='Phase: '+s.phase+(s.total?('  '+s.done+'/'+s.total):'')+(s.errors.length?(' | Errors: '+s.errors.length):'');if(!s.running){clearInterval(poll);b.textContent='Reset complete. '+JSON.stringify(s.result,null,1);setTimeout(()=>location.reload(),4000)}}catch(e){}},5000);
+ }catch(e){b.textContent='Reset failed: '+e}}
 </script>
 </body></html>`;
 }
@@ -417,8 +683,44 @@ const server = http.createServer(async (req, res) => {
       return json(res, 201, { ok: true, workItem: wi.id });
     }
     if (method === 'POST' && pathName === '/admin/reset') {
-      const out = await resetDemoData();
-      return json(res, 200, out);
+      if (resetJob.running) return json(res, 409, { error: 'reset already running', job: jobSnap() });
+      runResetJob().catch(e => log('reset job error', e.message));
+      return json(res, 202, { started: true, job: jobSnap() });
+    }
+    if (method === 'GET' && pathName === '/admin/reset/status') return json(res, 200, jobSnap());
+    if (method === 'POST' && pathName === '/migrate/jira-to-plane') {
+      if (migJob.running || resetJob.running) return json(res, 409, { error: 'another job is running' });
+      runMigrationJob().catch(e => log('migration job error', e.message));
+      return json(res, 202, { started: true, job: migSnap() });
+    }
+    if (method === 'GET' && pathName === '/migrate/status') return json(res, 200, migSnap());
+    if (method === 'GET' && pathName === '/terminal') return html(res, 200, execPage());
+    if (method === 'GET' && pathName === '/inspector') return html(res, 200, inspectorPage());
+    if (method === 'GET' && pathName === '/inspector/api/model') {
+      try {
+        const r = await fetch(CFG.agentUrl + '/model', { headers: { 'X-Agent-Token': CFG.agentToken } });
+        if (r.ok) return send(res, 200, await r.text(), 'application/xml; charset=utf-8');
+      } catch (e) { }
+      const xml = fs.readFileSync(path.join(__dirname, 'assets', 'OCP_case.bpmn'), 'utf8');
+      return send(res, 200, xml, 'application/xml; charset=utf-8');
+    }
+    if (method === 'GET' && pathName === '/inspector/api/instances') return json(res, 200, await flowableApi('GET', '/service/runtime/process-instances?size=20&includeProcessVariables=true'));
+    if (method === 'GET' && pathName.startsWith('/inspector/api/instance/')) {
+      const pid = pathName.split('/').pop();
+      const [hist, det] = await Promise.all([
+        flowableApi('GET', `/service/history/historic-activity-instances?processInstanceId=${pid}`).catch(() => ({ data: [] })),
+        flowableApi('GET', `/service/runtime/process-instances/${pid}?includeProcessVariables=true`).catch(() => ({})),
+      ]);
+      const acts = (hist.data || []).filter(a => a.activityType !== 'sequenceFlow').sort((a, b) => String(a.startTime).localeCompare(String(b.startTime))).map(a => ({ activityId: a.activityId, name: a.activityName, type: a.activityType, start: a.startTime, end: a.endTime }));
+      return json(res, 200, { id: pid, activities: acts, variables: det.variables || {} });
+    }
+    if (method === 'GET' && pathName === '/inspector/api/log') return send(res, 200, RING.slice(-100).join(String.fromCharCode(10)), 'text/plain; charset=utf-8');
+    if (method === 'POST' && pathName === '/admin/exec') {
+      if (!CFG.agentToken) return json(res, 500, { error: 'agent token not configured' });
+      const raw = await new Promise(r2 => { let d = ''; req.on('data', c => d += c); req.on('end', () => r2(d)); });
+      let id = null; try { id = JSON.parse(raw || '{}').id; } catch (e) { }
+      if (!id) return json(res, 400, { error: 'missing id' });
+      try { return json(res, 200, await agentRun(id)); } catch (e) { return json(res, 502, { error: e.message.slice(0, 160) }); }
     }
     if (method === 'GET' && pathName === '/status') return json(res, 200, await liveStatus());
     if (pathName.startsWith('/mock/')) return routeMocks(pathName, method, req.method === 'POST' ? safeJson((await readBody(req)).toString('utf8')) : null, u, res);
