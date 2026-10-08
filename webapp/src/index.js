@@ -204,6 +204,8 @@ function routeMocks(pathname, method, body, u, res) {
 
 /* ---------------- Plane webhook handling ---------------- */
 const seen = new Map(); // idempotency
+let MIGRATED = false;        // Inspector shows the migrated model only after a successful workflow migration
+let SUPPRESS_WEBHOOK = false; // true during reset / bulk import: seeded + migrated dossiers carry no live case
 function findWorkItem(node, depth) {
   if (!node || typeof node !== 'object' || depth > 6) return null;
   if (Array.isArray(node)) { for (let i = 0; i < node.length; i++) { const f = findWorkItem(node[i], depth + 1); if (f) return f; } return null; }
@@ -220,6 +222,7 @@ async function handleWebhook(bodyBuf, signature) {
   if (ev === 'issue' && body.action) ev = 'workitem.' + (body.action === 'create' ? 'created' : body.action === 'update' ? 'updated' : body.action === 'delete' ? 'deleted' : body.action);
   log('webhook event', ev);
   if (ev !== 'workitem.created') return { skipped: 'event ' + ev };
+  if (SUPPRESS_WEBHOOK) { log('webhook supprime (reset/import en cours)', ev); return { skipped: 'suppressed during reset/import' }; }
   const wi = findWorkItem(body, 0);
   if (!wi) { log('webhook skip: aucun work item dans le payload (keys=' + Object.keys(body).join(',') + ')'); return { skipped: 'no work item in payload' }; }
   const proj = wi.project_id || wi.project || null;
@@ -327,7 +330,7 @@ select{background:#0c0c10;color:#e8e6e1;border:1px solid #2a2a33;border-radius:6
 <script>
 var viewer=null;
 function showErr(m){var c=document.getElementById('canvas');if(c)c.innerHTML='<div style="color:#ff6b6b;font:12px monospace;padding:14px">BPMN : '+String(m).replace(/</g,'&lt;')+'</div>'}
-fetch('/inspector/api/model').then(function(r){return r.text()}).then(function(x){
+fetch('/inspector/api/model').then(function(r){ if(!r.ok){throw new Error('empty:'+r.status)} return r.text()}).then(function(x){
   try{
     viewer=new BpmnJS({container:'#canvas'});
     viewer.importXML(x).then(function(){
@@ -336,7 +339,9 @@ fetch('/inspector/api/model').then(function(r){return r.text()}).then(function(x
       if(!n)showErr('modele sans section BPMNDiagram (DI) - regenerer le modele converti');
     }).catch(function(e){showErr('importXML: '+(e&&e.message?e.message:e))});
   }catch(e){showErr('init viewer: '+String(e))}
-}).catch(function(e){showErr('chargement du modele: '+e)});
+}).catch(function(e){var m=String(e&&e.message||e);
+  if(m.indexOf('empty:')===0){var c=document.getElementById('canvas');if(c)c.innerHTML='<div style="color:#6f6f78;font:13px \'Montserrat\',sans-serif;padding:24px;text-align:center;padding-top:190px">Aucun workflow migr\u00e9.<br><span style="font-size:11px">Le mod\u00e8le BPMN migr\u00e9 depuis Jira appara\u00eetra ici pendant la d\u00e9mo : terminal op\u00e9rateur \u2192 workflow-migrate.</span></div>'}
+  else showErr('chargement du modele: '+m)});
 fetch('/inspector/api/instances').then(function(r){return r.json()}).then(function(d){var sel=document.getElementById('inst');sel.innerHTML='';(d.data||[]).forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=(p.processDefinitionName||p.processDefinitionKey)+' — '+p.id.slice(0,8);sel.appendChild(o)});if(!(d.data||[]).length){sel.innerHTML='<option value="">aucun processus actif</option>'}});
 function load(){var id=document.getElementById('inst').value;if(!id)return;
 fetch('/inspector/api/instance/'+id).then(function(r){return r.json()}).then(function(d){
@@ -403,6 +408,15 @@ async function resetFlowableOnly() {
       catch (e) { out.errors.push(`proc ${p.id}: ${e.message.slice(0, 120)}`); }
     }
   } catch (e) { out.errors.push(`processes list: ${e.message.slice(0, 160)}`); }
+  try {
+    const defs = await flowableApi('GET', '/service/repository/process-definitions?latest=false&size=200');
+    for (const d of (defs.data || [])) {
+      if (d.key === 'OCP_case' && (d.version || 0) > 1) {
+        try { await flowableApi('DELETE', `/service/repository/process-definitions/${d.id}?cascade=true`); out.deletedDefs = (out.deletedDefs || 0) + 1; }
+        catch (e) { out.errors.push(`def ${d.id}: ${e.message.slice(0, 120)}`); }
+      }
+    }
+  } catch (e) { out.errors.push(`defs list: ${e.message.slice(0, 160)}`); }
   return out;
 }
 const resetJob = { running: false, startedAt: null, finishedAt: null, phase: 'idle', done: 0, total: 0, errors: [], result: null };
@@ -411,6 +425,7 @@ function jobSnap() {
 }
 async function runResetJob() {
   resetJob.running = true; resetJob.startedAt = Date.now(); resetJob.finishedAt = null; resetJob.done = 0; resetJob.total = 0; resetJob.errors = []; resetJob.result = null; resetJob.phase = 'wiping Plane';
+  MIGRATED = false; SUPPRESS_WEBHOOK = true;
   try {
     const planePart = await resetPlaneOnly();
     resetJob.phase = 'wiping Flowable';
@@ -423,6 +438,7 @@ async function runResetJob() {
     const seeded = CFG.jiraPass ? await jiraSeedDataset(resetJob) : 0;
     resetJob.result = { ...planePart, planeSeeded, deletedProcesses: flowPart.deletedProcesses, jiraDeleted: jdel, jiraSeeded: seeded };
   } catch (e) { resetJob.errors.push('fatal: ' + e.message.slice(0, 200)); }
+  SUPPRESS_WEBHOOK = false;
   resetJob.phase = resetJob.errors.length ? 'error' : 'done';
   resetJob.running = false; resetJob.finishedAt = Date.now();
   log('reset job finished', resetJob.phase);
@@ -698,6 +714,7 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET' && pathName === '/terminal') return html(res, 200, execPage());
     if (method === 'GET' && pathName === '/inspector') return html(res, 200, inspectorPage());
     if (method === 'GET' && pathName === '/inspector/api/model') {
+      if (!MIGRATED) return json(res, 404, { empty: true, reason: 'Aucun workflow migr\u00e9 \u2014 la migration Jira\u2192BPMN se fait en direct pendant la d\u00e9mo (terminal op\u00e9rateur).' });
       try {
         const r = await fetch(CFG.agentUrl + '/model', { headers: { 'X-Agent-Token': CFG.agentToken } });
         if (r.ok) return send(res, 200, await r.text(), 'application/xml; charset=utf-8');
@@ -721,7 +738,13 @@ const server = http.createServer(async (req, res) => {
       const raw = await new Promise(r2 => { let d = ''; req.on('data', c => d += c); req.on('end', () => r2(d)); });
       let id = null; try { id = JSON.parse(raw || '{}').id; } catch (e) { }
       if (!id) return json(res, 400, { error: 'missing id' });
-      try { return json(res, 200, await agentRun(id)); } catch (e) { return json(res, 502, { error: e.message.slice(0, 160) }); }
+      const bulk = (id === 'jira-import' || id === 'jira-import-wipe');
+      if (bulk) SUPPRESS_WEBHOOK = true;
+      try {
+        const out = await agentRun(id);
+        if (out && out.exit === 0 && ['workflow-migrate', 'jira-dry', 'jira-import', 'jira-import-wipe'].indexOf(id) !== -1) MIGRATED = true;
+        return json(res, 200, out);
+      } catch (e) { return json(res, 502, { error: e.message.slice(0, 160) }); } finally { if (bulk) SUPPRESS_WEBHOOK = false; }
     }
     if (method === 'GET' && pathName === '/status') return json(res, 200, await liveStatus());
     if (pathName.startsWith('/mock/')) return routeMocks(pathName, method, req.method === 'POST' ? safeJson((await readBody(req)).toString('utf8')) : null, u, res);
