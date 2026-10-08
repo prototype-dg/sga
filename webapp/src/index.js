@@ -17,6 +17,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { URL } = require('url');
+process.on('unhandledRejection', e => { try { log('unhandledRejection', (e && e.message) || String(e)); } catch (_) { } });
+process.on('uncaughtException', e => { try { log('uncaughtException', (e && e.message) || String(e)); } catch (_) { } });
 
 const ENV = process.env;
 const PORT = Number(ENV.PORT || ENV.MIDDLEWARE_PORT || 3000);
@@ -744,7 +746,7 @@ const server = http.createServer(async (req, res) => {
         const out = await agentRun(id);
         if (out && out.exit === 0 && ['workflow-migrate', 'jira-dry', 'jira-import', 'jira-import-wipe'].indexOf(id) !== -1) MIGRATED = true;
         return json(res, 200, out);
-      } catch (e) { return json(res, 502, { error: e.message.slice(0, 160) }); } finally { if (bulk) SUPPRESS_WEBHOOK = false; }
+      } catch (e) { return json(res, 502, { error: e.message.slice(0, 160) }); } finally { if (bulk) setTimeout(function () { SUPPRESS_WEBHOOK = false; log('fenetre de suppression webhook fermee (90s)'); }, 90000); }
     }
     if (method === 'GET' && pathName === '/status') return json(res, 200, await liveStatus());
     if (pathName.startsWith('/mock/')) return routeMocks(pathName, method, req.method === 'POST' ? safeJson((await readBody(req)).toString('utf8')) : null, u, res);

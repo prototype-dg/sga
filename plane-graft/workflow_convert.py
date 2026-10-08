@@ -201,19 +201,61 @@ for n in allnodes:
     x, y = coords[n]
     w, h = size[n]
     O.append('      <bpmndi:BPMNShape id="%s_di" bpmnElement="%s"><dc:Bounds x="%d" y="%d" width="%d" height="%d"/></bpmndi:BPMNShape>' % (n, n, x, y, w, h))
+band_ys = {}
+for n in allnodes:
+    bb = layer[n] // PER_ROW
+    x, y = coords[n]
+    band_ys.setdefault(bb, [y, y])
+    band_ys[bb][0] = min(band_ys[bb][0], y)
+    band_ys[bb][1] = max(band_ys[bb][1], y)
+chan_top = {bb: band_ys[bb][0] - 30 for bb in band_ys}
+chan_bot = {bb: band_ys[bb][1] + 40 for bb in band_ys}
+chan_use = {}
+
+
+def route(a, b):
+    ax, ay = coords[a]
+    aw, ah = size[a]
+    bx, by = coords[b]
+    bw, bh = size[b]
+    acy = ay + ah // 2
+    bcy = by + bh // 2
+    if a == b:
+        return [(ax + int(aw * 0.72), ay), (ax + int(aw * 0.72), ay - 22), (ax + int(aw * 0.28), ay - 22), (ax + int(aw * 0.28), ay)]
+    aband = layer[a] // PER_ROW
+    bband = layer[b] // PER_ROW
+    ka = order.get(layer[a], []).index(a) if a in order.get(layer[a], []) else 0
+    kb = order.get(layer[b], []).index(b) if b in order.get(layer[b], []) else 0
+    cid = ('top', aband) if layer[b] >= layer[a] and not (aband == bband and layer[b] < layer[a]) else ('bot', aband)
+    i = chan_use.get(cid, 0)
+    chan_use[cid] = i + 1
+    off = (i % 5) * 8 - 16
+    if aband == bband and bx - ax == SLOT_W and bx > ax:
+        return [(ax + aw, acy), (bx, bcy)]
+    if aband == bband and ax == bx and abs(ka - kb) == 1:
+        if by > ay:
+            return [(ax + aw // 2, ay + ah), (bx + bw // 2, by)]
+        return [(ax + aw // 2, ay), (bx + bw // 2, by + bh)]
+    if layer[b] >= layer[a]:
+        if aband == bband and bx - ax <= 2 * SLOT_W:
+            gx = bx - 34
+            return [(ax + aw, acy), (gx, acy), (gx, bcy), (bx, bcy)]
+        gut = (chan_top[aband] if aband == bband else chan_bot[min(aband, bband)]) + off
+        fx = ax + aw + 34
+        gx = bx - 34
+        return [(ax + aw, acy), (fx, acy), (fx, gut), (gx, gut), (gx, bcy), (bx, bcy)]
+    cb = chan_bot[aband] + off
+    lx = ax - 34
+    rx = bx + bw + 34
+    return [(ax, acy), (lx, acy), (lx, cb), (rx, cb), (rx, bcy), (bx + bw, bcy)]
+
+
 n_self = 0
 for fid, a, b in flows:
+    pts = route(a, b)
     if a == b:
-        x, y = coords[a]
-        w, h = size[a]
-        pts = [(x + int(w * 0.72), y), (x + int(w * 0.72), y - 22), (x + int(w * 0.28), y - 22), (x + int(w * 0.28), y)]
         n_self += 1
-    else:
-        ca, cb = center(a), center(b)
-        wa, ha = size[a]
-        wb, hb = size[b]
-        pts = [clip(ca[0], ca[1], cb[0], cb[1], wa, ha), clip(cb[0], cb[1], ca[0], ca[1], wb, hb)]
-    wp = ''.join('<di:waypoint x="%d" y="%d"/>' % p for p in pts)
+    wp = ''.join('<di:waypoint x="%d" y="%d"/>' % p2 for p2 in pts)
     O.append('      <bpmndi:BPMNEdge id="%s_di" bpmnElement="%s">%s</bpmndi:BPMNEdge>' % (fid, fid, wp))
 O.append('    </bpmndi:BPMNPlane>')
 O.append('  </bpmndi:BPMNDiagram>')
