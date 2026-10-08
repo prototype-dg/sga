@@ -244,6 +244,14 @@ for band in range((maxL // PER_ROW) + 1):
             band_h = max(band_h, k * SLOT_H + (h if n in ('start', 'end') else H) + 30)
     band_y += band_h + 70
 size = {n: (SW, SH) if n in ('start', 'end') else (W, H) for n in allnodes}
+for n in allnodes:
+    if n.startswith('appli_'):
+        size[n] = (220, 100)
+if set(EMBED) >= set(allnodes):
+    for n in allnodes:
+        if n.startswith('appli_'):
+            EMBED[n][0] -= 20
+            EMBED[n][1] -= 10
 if set(EMBED) >= set(allnodes):
     coords = {n: tuple(EMBED[n]) for n in allnodes}
 

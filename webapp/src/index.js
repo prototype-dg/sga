@@ -326,8 +326,8 @@ select{background:#0c0c10;color:#e8e6e1;border:1px solid #2a2a33;border-radius:6
 .lbl-light .djs-label,.djs-label{fill:#e8e6e1 !important;paint-order:stroke !important;stroke:#0c0c10 !important;stroke-width:3px !important;stroke-linejoin:round !important}
 .t-ext rect{fill:#E9041E !important;stroke:#ff8a96 !important}
 .t-int rect{fill:#E9741E !important;stroke:#ffb266 !important}
-.t-ext .djs-label,.t-ext text.djs-label{fill:#fff !important;paint-order:stroke !important;stroke:#0c0c10 !important;stroke-width:2.5px !important}
-.t-int .djs-label,.t-int text.djs-label{fill:#fff !important;paint-order:stroke !important;stroke:#0c0c10 !important;stroke-width:2.5px !important}
+.t-ext .djs-label,.t-ext text.djs-label{fill:#fff !important;paint-order:stroke !important;stroke:#0c0c10 !important;stroke-width:2.5px !important;font-size:14px !important;font-weight:600 !important}
+.t-int .djs-label,.t-int text.djs-label{fill:#fff !important;paint-order:stroke !important;stroke:#0c0c10 !important;stroke-width:2.5px !important;font-size:14px !important;font-weight:600 !important}
 .t-manual .djs-label,.t-manual text.djs-label{fill:#111 !important;paint-order:stroke !important;stroke:#ffffff !important;stroke-width:2.5px !important}
 .legend{display:flex;gap:14px;align-items:center;color:#9a9a9a;font-size:11px;margin-top:6px}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
