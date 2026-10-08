@@ -57,7 +57,7 @@ function readBody(req, limit = 2 * 1024 * 1024) {
     req.on('error', reject);
   });
 }
-function json(res, code, obj) { const b = JSON.stringify(obj); res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(b) }); res.end(b); }
+function json(res, code, obj) { try { res.setHeader('cache-control', 'no-store'); } catch (e) { } const b = JSON.stringify(obj); res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(b) }); res.end(b); }
 function send(res, code, text, ct = 'text/plain') { const b = Buffer.from(text); res.writeHead(code, { 'content-type': ct, 'content-length': b.length }); res.end(b); }
 function html(res, code, text) { try { res.setHeader('cache-control', 'no-store'); } catch (e) { } return send(res, code, text, 'text/html; charset=utf-8'); }
 
@@ -336,7 +336,7 @@ var modelLoaded=false;
 var stEl2=document.createElement('span');stEl2.id='st-inst';stEl2.style.cssText='font-size:11px;margin-left:8px;color:#6f6f78';stEl2.textContent='…';document.querySelector('.sub').appendChild(stEl2);
 var stEl=document.createElement('span');stEl.id='st-model';stEl.style.cssText='color:#febc2e;font-size:11px;margin-left:8px';stEl.textContent='\u23f3 en attente de migration \u2014 v\u00e9rification toutes les 5 s';document.querySelector('.sub').appendChild(stEl);
 function loadModel(){
-fetch('/inspector/api/model').then(function(r){ if(!r.ok){throw new Error('empty:'+r.status)} return r.text()}).then(function(x){
+fetch('/inspector/api/model?t='+Date.now()).then(function(r){ if(!r.ok){throw new Error('empty:'+r.status)} return r.text()}).then(function(x){
   if(modelLoaded)return; modelLoaded=true;
   stEl.textContent='\u2713 mod\u00e8le migr\u00e9 charg\u00e9';stEl.style.color='#28c840';
   var c=document.getElementById('canvas');c.innerHTML='';c.removeAttribute('data-empty');
@@ -355,7 +355,7 @@ fetch('/inspector/api/model').then(function(r){ if(!r.ok){throw new Error('empty
   else {showErr('chargement du modele: '+m);setTimeout(loadModel,10000);}
 })}
 loadModel();
-function loadInstances(){fetch('/inspector/api/instances').then(function(r){return r.json()}).then(function(d){var sel=document.getElementById('inst');var cur=sel.value;var opts=(d.data||[]);sel.innerHTML='';opts.forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=(p.processDefinitionName||p.processDefinitionKey)+' — '+p.id.slice(0,8);sel.appendChild(o)});if(cur&&opts.some(function(p){return p.id===cur}))sel.value=cur;if(!opts.length){sel.innerHTML='<option value="">aucun processus actif</option>'}
+function loadInstances(){fetch('/inspector/api/instances?t='+Date.now()).then(function(r){return r.json()}).then(function(d){var sel=document.getElementById('inst');var cur=sel.value;var opts=(d.data||[]);sel.innerHTML='';opts.forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=(p.processDefinitionName||p.processDefinitionKey)+' — '+p.id.slice(0,8);sel.appendChild(o)});if(cur&&opts.some(function(p){return p.id===cur}))sel.value=cur;if(!opts.length){sel.innerHTML='<option value="">aucun processus actif</option>'}
 var ct=document.getElementById('st-inst');if(ct){ct.textContent=opts.length?('\u2713 '+opts.length+' dossier(s) en cours'):'0 dossier en cours';ct.style.color=opts.length?'#28c840':'#6f6f78'}}).catch(function(e){})}
 loadInstances();setInterval(loadInstances,10000);
 function load(){var id=document.getElementById('inst').value;if(!id)return;
@@ -365,7 +365,7 @@ fetch('/inspector/api/instance/'+id).then(function(r){return r.json()}).then(fun
   try{viewer.get('canvas').addMarker(a.activityId,a.end?'bjs-done':'bjs-active')}catch(e){}});
  var vs='';Object.keys(d.variables||{}).forEach(function(k){vs+='<div><b>'+k+'</b> : '+(d.variables[k]&&d.variables[k].value!==undefined?d.variables[k].value:d.variables[k])+'</div>'});
  document.getElementById('vars').innerHTML=vs||'<span class="empty">—</span>';});}
-setInterval(function(){fetch('/inspector/api/log').then(function(r){return r.text()}).then(function(t){document.getElementById('log').textContent=t.slice(-3000)})},3000);
+setInterval(function(){fetch('/inspector/api/log?t='+Date.now()).then(function(r){return r.text()}).then(function(t){document.getElementById('log').textContent=t.slice(-3000)})},3000);
 </script></body></html>`;
 }
 
