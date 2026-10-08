@@ -347,7 +347,7 @@ var h='<div><b>'+(el.businessObject.name||el.id)+'</b></div>';
 h+='<div style="margin:4px 0"><span style="color:'+(isAuto?'#E9041E':'#28c840')+';font-weight:600">'+(isAuto?'AUTOMATIQUE [APPLI]':'MANUELLE (agent)')+'</span></div>';
 h+='<div style="color:#9a9a9a;font-size:11px;line-height:1.6">'+doc+'</div>';
 if(isAuto){h+='<div style="margin-top:6px;font:11px monospace;color:#febc2e">bridge appliBridge > middleware > appel REST/WSO2 cote SGA</div>'}else{h+='<div style="margin-top:6px">Dossier courant : '+(ref||'-')+'<br><a href="'+url+'" target="_blank" style="color:#E9041E">Ouvrir le dossier dans Jira</a></div>'}
-document.getElementById('detail').innerHTML=h}))}catch(e){}}
+document.getElementById('detail').innerHTML=h})}catch(e){}}
 var stEl2=document.createElement('span');stEl2.id='st-inst';stEl2.style.cssText='font-size:11px;margin-left:8px;color:#6f6f78';stEl2.textContent='…';document.querySelector('.sub').appendChild(stEl2);
 var stEl=document.createElement('span');stEl.id='st-model';stEl.style.cssText='color:#febc2e;font-size:11px;margin-left:8px';stEl.textContent='\u23f3 en attente de migration \u2014 v\u00e9rification toutes les 5 s';document.querySelector('.sub').appendChild(stEl);
 function loadModel(){
