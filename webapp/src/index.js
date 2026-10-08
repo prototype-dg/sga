@@ -59,7 +59,7 @@ function readBody(req, limit = 2 * 1024 * 1024) {
 }
 function json(res, code, obj) { const b = JSON.stringify(obj); res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(b) }); res.end(b); }
 function send(res, code, text, ct = 'text/plain') { const b = Buffer.from(text); res.writeHead(code, { 'content-type': ct, 'content-length': b.length }); res.end(b); }
-function html(res, code, text) { return send(res, code, text, 'text/html; charset=utf-8'); }
+function html(res, code, text) { try { res.setHeader('cache-control', 'no-store'); } catch (e) { } return send(res, code, text, 'text/html; charset=utf-8'); }
 
 /* ---------------- HTTP to Plane ---------------- */
 async function planeApi(method, path, body) {
@@ -333,6 +333,7 @@ select{background:#0c0c10;color:#e8e6e1;border:1px solid #2a2a33;border-radius:6
 var viewer=null;
 function showErr(m){var c=document.getElementById('canvas');if(c)c.innerHTML='<div style="color:#ff6b6b;font:12px monospace;padding:14px">BPMN : '+String(m).replace(/</g,'&lt;')+'</div>'}
 var modelLoaded=false;
+var stEl2=document.createElement('span');stEl2.id='st-inst';stEl2.style.cssText='font-size:11px;margin-left:8px;color:#6f6f78';stEl2.textContent='…';document.querySelector('.sub').appendChild(stEl2);
 var stEl=document.createElement('span');stEl.id='st-model';stEl.style.cssText='color:#febc2e;font-size:11px;margin-left:8px';stEl.textContent='\u23f3 en attente de migration \u2014 v\u00e9rification toutes les 5 s';document.querySelector('.sub').appendChild(stEl);
 function loadModel(){
 fetch('/inspector/api/model').then(function(r){ if(!r.ok){throw new Error('empty:'+r.status)} return r.text()}).then(function(x){
@@ -354,7 +355,8 @@ fetch('/inspector/api/model').then(function(r){ if(!r.ok){throw new Error('empty
   else {showErr('chargement du modele: '+m);setTimeout(loadModel,10000);}
 })}
 loadModel();
-function loadInstances(){fetch('/inspector/api/instances').then(function(r){return r.json()}).then(function(d){var sel=document.getElementById('inst');var cur=sel.value;var opts=(d.data||[]);sel.innerHTML='';opts.forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=(p.processDefinitionName||p.processDefinitionKey)+' — '+p.id.slice(0,8);sel.appendChild(o)});if(cur&&opts.some(function(p){return p.id===cur}))sel.value=cur;if(!opts.length){sel.innerHTML='<option value="">aucun processus actif</option>'}}).catch(function(e){})}
+function loadInstances(){fetch('/inspector/api/instances').then(function(r){return r.json()}).then(function(d){var sel=document.getElementById('inst');var cur=sel.value;var opts=(d.data||[]);sel.innerHTML='';opts.forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=(p.processDefinitionName||p.processDefinitionKey)+' — '+p.id.slice(0,8);sel.appendChild(o)});if(cur&&opts.some(function(p){return p.id===cur}))sel.value=cur;if(!opts.length){sel.innerHTML='<option value="">aucun processus actif</option>'}
+var ct=document.getElementById('st-inst');if(ct){ct.textContent=opts.length?('\u2713 '+opts.length+' dossier(s) en cours'):'0 dossier en cours';ct.style.color=opts.length?'#28c840':'#6f6f78'}}).catch(function(e){})}
 loadInstances();setInterval(loadInstances,10000);
 function load(){var id=document.getElementById('inst').value;if(!id)return;
 fetch('/inspector/api/instance/'+id).then(function(r){return r.json()}).then(function(d){
