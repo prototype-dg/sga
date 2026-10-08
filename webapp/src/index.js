@@ -324,6 +324,10 @@ select{background:#0c0c10;color:#e8e6e1;border:1px solid #2a2a33;border-radius:6
 
 .t-auto .djs-label{fill:#fff !important}
 .lbl-light .djs-label{fill:#e8e6e1 !important}
+.t-ext rect{fill:#E9041E !important;stroke:#ff8a96 !important}
+.t-ext .djs-label{fill:#fff !important}
+.t-int rect{fill:#E9741E !important;stroke:#ffb266 !important}
+.t-int .djs-label{fill:#fff !important}
 .legend{display:flex;gap:14px;align-items:center;color:#9a9a9a;font-size:11px;margin-top:6px}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
 .legend i.m{background:#fff}.legend i.a{background:#E9041E}.legend i.i{background:#E9741E}
@@ -339,7 +343,7 @@ select{background:#0c0c10;color:#e8e6e1;border:1px solid #2a2a33;border-radius:6
 var viewer=null;
 function showErr(m){var c=document.getElementById('canvas');if(c)c.innerHTML='<div style="color:#ff6b6b;font:12px monospace;padding:14px">BPMN : '+String(m).replace(/</g,'&lt;')+'</div>'}
 var modelLoaded=false;
-function colorize(){try{var reg=viewer.get('elementRegistry');var cv=viewer.get('canvas');reg.getAll().forEach(function(el){if(el.type==='bpmn:UserTask')cv.addMarker(el.id,'t-manual');if(el.type==='bpmn:ServiceTask')cv.addMarker(el.id,'t-auto');if(el.type==='label'&&el.labelTarget&&(el.labelTarget.type==='bpmn:SequenceFlow'||el.labelTarget.type==='bpmn:StartEvent'||el.labelTarget.type==='bpmn:EndEvent'))cv.addMarker(el.id,'lbl-light')})}catch(e){}}
+function colorize(){try{var reg=viewer.get('elementRegistry');var cv=viewer.get('canvas');reg.getAll().forEach(function(el){var bo=el.businessObject||{};var doc=((bo.documentation&&bo.documentation[0]&&bo.documentation[0].text)||'');if(el.type==='bpmn:UserTask')cv.addMarker(el.id,'t-manual');if(el.type==='bpmn:ServiceTask')cv.addMarker(el.id,doc.indexOf('EXTERNE')!==-1?'t-ext':'t-int');if(el.type==='label'&&el.labelTarget&&(el.labelTarget.type==='bpmn:SequenceFlow'||el.labelTarget.type==='bpmn:StartEvent'||el.labelTarget.type==='bpmn:EndEvent'))cv.addMarker(el.id,'lbl-light')})}catch(e){}}
 function bindClick(){try{viewer.get('eventBus').on('element.click',function(e){var el=e.element;if(!el||!el.type||el.type.indexOf('Task')===-1)return;var isAuto=el.type==='bpmn:ServiceTask';var doc='';try{var bo=el.businessObject;doc=(bo.documentation&&bo.documentation[0]&&bo.documentation[0].text)||''}catch(x){}
 var isExt=isAuto&&doc.indexOf('EXTERNE')!==-1;var isInt=isAuto&&!isExt;var enName='';try{var mEN=doc.split(' EN: ')[1];if(mEN)enName=mEN.split(' - ')[0]}catch(x){}
 var v=window._curVars||{};var ref=null;var nm2=String(v.dossierName||'');var p2=nm2.split('OCP-')[1];if(!p2){nm2=String(v.dossierId||'');p2=nm2.split('OCP-')[1]}if(p2)ref='OCP-'+p2.slice(0,9);
