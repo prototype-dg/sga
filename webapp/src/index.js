@@ -207,7 +207,7 @@ const seen = new Map(); // idempotency
 function findWorkItem(node, depth) {
   if (!node || typeof node !== 'object' || depth > 6) return null;
   if (Array.isArray(node)) { for (let i = 0; i < node.length; i++) { const f = findWorkItem(node[i], depth + 1); if (f) return f; } return null; }
-  if (node.id && node.project_id && node.name !== undefined) return node;
+  if (node.id && (node.project_id || node.project) && node.name !== undefined) return node;
   for (const k of Object.keys(node)) { const f = findWorkItem(node[k], depth + 1); if (f) return f; }
   return null;
 }
@@ -222,15 +222,16 @@ async function handleWebhook(bodyBuf, signature) {
   if (ev !== 'workitem.created') return { skipped: 'event ' + ev };
   const wi = findWorkItem(body, 0);
   if (!wi) { log('webhook skip: aucun work item dans le payload (keys=' + Object.keys(body).join(',') + ')'); return { skipped: 'no work item in payload' }; }
-  if (!wi.id || !wi.project_id) { log('webhook skip: work item partiel (keys=' + Object.keys(wi).join(',') + ')'); return { skipped: 'no work item in payload' }; }
-  log('webhook work item', String(wi.name || wi.id));
-  if (String(wi.project_id) !== String(CFG.planeCreditProject)) { log('webhook skip: autre projet', String(wi.project_id)); return { skipped: 'other project' }; }
+  const proj = wi.project_id || wi.project || null;
+  if (!wi.id) { log('webhook skip: work item partiel (data=' + JSON.stringify(Object.keys(body.data || {})) + ')'); return { skipped: 'no work item in payload' }; }
+  log('webhook work item', String(wi.name || wi.id), 'projet', String(proj || '?'));
+  if (String(proj) !== String(CFG.planeCreditProject)) { log('webhook skip: autre projet', String(proj)); return { skipped: 'other project' }; }
   let ci = null;
   try {
     ci = await flowableStartProcess('OCP_case', { dossierId: String(wi.id), dossierName: String(wi.name || ''), stateId: String(wi.state_id || '') });
     log('flowable case started', ci.id);
   } catch (e) { log('flowable start failed', e.message.slice(0, 160)); }
-  try { await planeComment(wi.id, wi.project_id, `Dossier ouvert par le moteur (réf. Flowable <i>${ci ? ci.id : 'n/a'}</i>) — comportement « post-fonction » natif.`); } catch (e) { log('comment warn', e.message.slice(0, 120)); }
+  try { await planeComment(wi.id, proj, `Dossier ouvert par le moteur (réf. Flowable <i>${ci ? ci.id : 'n/a'}</i>) — comportement « post-fonction » natif.`); } catch (e) { log('comment warn', e.message.slice(0, 120)); }
   return { ok: true, caseId: ci ? ci.id : null };
 }
 
