@@ -69,9 +69,11 @@ O.append('<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns
 O.append('  <process id="OCP_case" name="Octroi de Credit (migr\u00e9 depuis Jira)">')
 O.append('    <startEvent id="start" name="Cr\u00e9ation dossier (APPLI)"/>')
 for nm in names:
-    O.append('    <userTask id="%s" name="%s" flowable:candidateGroups="SGA-%s"/>' % (sid(nm), esc(nm), esc(nm.split()[0])))
+    docu = "Etape manuelle (agent) - file : " + nm + " - groupe assigne : SGA-" + nm.split()[0] + ". Le dossier se traite dans Jira ; l'inspecteur fournit le lien direct selon le dossier courant."
+    O.append('    <userTask id="%s" name="%s" flowable:candidateGroups="SGA-%s"><documentation>%s</documentation></userTask>' % (sid(nm), esc(nm), esc(nm.split()[0]), esc(docu)))
 for k, (f, n, t) in enumerate(appli):
-    O.append('    <serviceTask id="appli_%d" name="%s" flowable:delegateExpression="${appliBridge}"/>' % (k, esc(n)))
+    doca = "Etape automatique [APPLI] : " + n + " - executee par le bridge Flowable (delegate appliBridge) vers le SI SGA (appel REST/WSO2), sans intervention agent."
+    O.append('    <serviceTask id="appli_%d" name="%s" flowable:delegateExpression="${appliBridge}"><documentation>%s</documentation></serviceTask>' % (k, esc(n), esc(doca)))
 O.append('    <endEvent id="end" name="Fin de parcours"/>')
 
 flows = []          # (fid, a, b) over node ids

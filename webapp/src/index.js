@@ -321,18 +321,33 @@ select{background:#0c0c10;color:#e8e6e1;border:1px solid #2a2a33;border-radius:6
 .bjs-done rect{fill:#28c840 !important;fill-opacity:.28 !important}
 .bjs-done circle{fill:#28c840 !important;fill-opacity:.28 !important}
 .bjs-active circle{fill:#E9041E !important;fill-opacity:.4 !important}
+.t-auto rect{fill:#E9041E !important;stroke:#ff8a96 !important}
+.t-auto .djs-label{fill:#fff !important}
+.lbl-light .djs-label{fill:#e8e6e1 !important}
+.legend{display:flex;gap:14px;align-items:center;color:#9a9a9a;font-size:11px;margin-top:6px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
+.legend i.m{background:#fff}.legend i.a{background:#E9041E}
 </style></head><body>
 <h1><span class="dot"></span>SGA Process Inspector — Octroi de Crédit</h1>
 <div class="sub">Ce qui se passe DERRIÈRE chaque action : moteur Flowable en direct — étape courante du processus, historique d'exécution, variables du dossier, journal d'appels de la couche d'intégration.</div>
-<div class="grid"><div class="panel"><h2>Processus (BPMN)</h2><div id="canvas"></div></div>
+<div class="grid"><div class="panel"><h2>Processus (BPMN)</h2><div id="canvas"></div><div class="legend"><span><i class="m"></i>Manuelle (agent)</span><span><i class="a"></i>Automatique [APPLI]</span><span>Cliquez une étape pour le détail</span></div></div>
 <div><div class="panel"><h2>Dossiers en cours (Flowable)</h2><select id="inst"><option value="">— chargement…</option></select><button class="btn" onclick="load()">Inspecter</button></div>
 <div class="panel" style="margin-top:12px"><h2>Étapes du parcours</h2><div class="tl" id="tl"><span class="empty">Choisissez un dossier puis « Inspecter ».</span></div></div>
-<div class="panel" style="margin-top:12px"><h2>Variables du dossier</h2><div class="vars" id="vars"><span class="empty">—</span></div></div></div></div>
+<div class="panel" style="margin-top:12px"><h2>Variables du dossier</h2><div class="vars" id="vars"><span class="empty">—</span></div></div><div class="panel" style="margin-top:12px"><h2>Détail de l'étape</h2><div class="vars" id="detail"><span class="empty">Cliquez sur une étape du diagramme.</span></div></div></div></div>
 <div class="panel" style="margin-top:12px"><h2>Journal de la couche d'intégration (temps réel)</h2><div class="log" id="log">…</div></div>
 <script>
 var viewer=null;
 function showErr(m){var c=document.getElementById('canvas');if(c)c.innerHTML='<div style="color:#ff6b6b;font:12px monospace;padding:14px">BPMN : '+String(m).replace(/</g,'&lt;')+'</div>'}
 var modelLoaded=false;
+function colorize(){try{var reg=viewer.get('elementRegistry');var cv=viewer.get('canvas');reg.getAll().forEach(function(el){if(el.type==='bpmn:UserTask')cv.addMarker(el.id,'t-manual');if(el.type==='bpmn:ServiceTask')cv.addMarker(el.id,'t-auto');if(el.type==='label'&&el.labelTarget&&(el.labelTarget.type==='bpmn:SequenceFlow'||el.labelTarget.type==='bpmn:StartEvent'||el.labelTarget.type==='bpmn:EndEvent'))cv.addMarker(el.id,'lbl-light')})}catch(e){}}
+function bindClick(){try{viewer.get('eventBus').on('element.click',function(e){var el=e.element;if(!el||!el.type||el.type.indexOf('Task')===-1)return;var isAuto=el.type==='bpmn:ServiceTask';var doc='';try{var bo=el.businessObject;doc=(bo.documentation&&bo.documentation[0]&&bo.documentation[0].text)||''}catch(x){}
+var v=window._curVars||{};var ref=null;var nm2=String(v.dossierName||'');var p2=nm2.split('OCP-')[1];if(!p2){nm2=String(v.dossierId||'');p2=nm2.split('OCP-')[1]}if(p2)ref='OCP-'+p2.slice(0,9);
+var url=ref?('http://74.162.153.131:8080/issues/?jql='+encodeURIComponent('summary ~ "'+ref+'"')):'http://74.162.153.131:8080/jira/software/c/projects/OCP';
+var h='<div><b>'+(el.businessObject.name||el.id)+'</b></div>';
+h+='<div style="margin:4px 0"><span style="color:'+(isAuto?'#E9041E':'#28c840')+';font-weight:600">'+(isAuto?'AUTOMATIQUE [APPLI]':'MANUELLE (agent)')+'</span></div>';
+h+='<div style="color:#9a9a9a;font-size:11px;line-height:1.6">'+doc+'</div>';
+if(isAuto){h+='<div style="margin-top:6px;font:11px monospace;color:#febc2e">bridge appliBridge > middleware > appel REST/WSO2 cote SGA</div>'}else{h+='<div style="margin-top:6px">Dossier courant : '+(ref||'-')+'<br><a href="'+url+'" target="_blank" style="color:#E9041E">Ouvrir le dossier dans Jira</a></div>'}
+document.getElementById('detail').innerHTML=h}))}catch(e){}}
 var stEl2=document.createElement('span');stEl2.id='st-inst';stEl2.style.cssText='font-size:11px;margin-left:8px;color:#6f6f78';stEl2.textContent='…';document.querySelector('.sub').appendChild(stEl2);
 var stEl=document.createElement('span');stEl.id='st-model';stEl.style.cssText='color:#febc2e;font-size:11px;margin-left:8px';stEl.textContent='\u23f3 en attente de migration \u2014 v\u00e9rification toutes les 5 s';document.querySelector('.sub').appendChild(stEl);
 function loadModel(){
@@ -343,7 +358,7 @@ fetch('/inspector/api/model?t='+Date.now()).then(function(r){ if(!r.ok){throw ne
   try{
     viewer=new BpmnJS({container:'#canvas'});
     viewer.importXML(x).then(function(){
-      try{viewer.get('canvas').zoom('fit-viewport')}catch(e){}
+      try{viewer.get('canvas').zoom('fit-viewport')}catch(e){}colorize();bindClick();
       var n=(x.match(/BPMNShape/g)||[]).length;
       if(!n)showErr('modele sans section BPMNDiagram (DI) - regenerer le modele converti');
     }).catch(function(e){showErr('importXML: '+(e&&e.message?e.message:e))});
@@ -358,8 +373,8 @@ loadModel();
 function loadInstances(){fetch('/inspector/api/instances?t='+Date.now()).then(function(r){return r.json()}).then(function(d){var sel=document.getElementById('inst');var cur=sel.value;var opts=(d.data||[]);sel.innerHTML='';opts.forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=(p.processDefinitionName||p.processDefinitionKey)+' — '+p.id.slice(0,8);sel.appendChild(o)});if(cur&&opts.some(function(p){return p.id===cur}))sel.value=cur;if(!opts.length){sel.innerHTML='<option value="">aucun processus actif</option>'}
 var ct=document.getElementById('st-inst');if(ct){ct.textContent=opts.length?('\u2713 '+opts.length+' dossier(s) en cours'):'0 dossier en cours';ct.style.color=opts.length?'#28c840':'#6f6f78'}}).catch(function(e){})}
 loadInstances();setInterval(loadInstances,10000);
-function load(){var id=document.getElementById('inst').value;if(!id)return;
-fetch('/inspector/api/instance/'+id).then(function(r){return r.json()}).then(function(d){
+function load(){var id=document.getElementById('inst').value;if(!id)return;window._curId=id;
+fetch('/inspector/api/instance/'+id+'?t='+Date.now()).then(function(r){return r.json()}).then(function(d){window._curVars={};Object.keys(d.variables||{}).forEach(function(k){var v=d.variables[k];window._curVars[k]=(v&&v.value!==undefined)?v.value:v});
  var tl=document.getElementById('tl');tl.innerHTML='';
  (d.activities||[]).forEach(function(a){var e=document.createElement('div');e.className='t '+(a.end? 'done':'act');e.textContent=(a.end?'✓ ':'▶ ')+(a.name||a.activityId||'?')+'  '+(a.start? a.start.slice(11,19):'');tl.appendChild(e);
   try{viewer.get('canvas').addMarker(a.activityId,a.end?'bjs-done':'bjs-active')}catch(e){}});
