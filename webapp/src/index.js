@@ -281,7 +281,7 @@ button{background:#E9041E;color:#fff;border:none;border-radius:6px;padding:8px 1
 </div><div class="inrow"><span class="prompt">operator@sga:~$</span><input id="inp" placeholder="id de commande (ex: jira-dry)" spellcheck="false"/><button id="run">Run</button></div></div>
 <div class="note">Commandes admises : workflow-migrate · jira-dry · jira-import · jira-import-wipe (les trois intègrent la migration du workflow) · docker-ps · flowable-instances · jira-count · plane-count — tout autre id est refusé par l'agent.</div>
 </div><script>
-var CMDS={'workflow-migrate':'python3 workflow_convert.py — lit le XML du workflow Jira (34 étapes, 122 transitions) et déploie le BPMN converti dans Flowable','jira-dry':'docker exec -w /code sga-api-1 python manage.py jira_import --jira-url http://74.162.153.131:8080 --pat *** --jira-project OCP --plane-project 7843…7c5 --dry-run','jira-import':'docker exec -w /code sga-api-1 python manage.py jira_import --jira-url … --pat *** --jira-project OCP --plane-project 7843…7c5','jira-import-wipe':'workflow-migrate + jira_import --wipe-all (migre le workflow PUIS remplace le contenu du projet)','docker-ps':'docker ps --format {{.Names}}\\t{{.Status}}','flowable-instances':"curl -u rest-admin:test http://localhost:8081/flowable-rest/service/runtime/process-instances",'jira-count':"curl -u azurea:*** http://74.162.153.131:8080/rest/api/2/search?jql=project=OCP",'plane-count':'psql: SELECT state, count(*) FROM issues GROUP BY state'};
+var CMDS={'workflow-migrate':'python3 workflow_convert.py — lit le XML du workflow Jira (34 étapes, 122 transitions) et déploie le BPMN converti dans Flowable','jira-dry':'docker exec -w /code sga-api-1 python manage.py jira_import --jira-url http://74.162.153.131:8080 --pat *** --jira-project OCP --plane-project 7843…7c5 --dry-run','jira-import':'docker exec -w /code sga-api-1 python manage.py jira_import --jira-url … --pat *** --jira-project OCP --plane-project 7843…7c5','jira-import-wipe':'workflow-migrate + jira_import --wipe-all (migre le workflow PUIS remplace le contenu du projet)','jira-import-phases':'workflow-migrate + jira_import --wipe-all --phase-board 2 (migre le workflow, remplace le contenu du projet et applique les 7 colonnes du board Jira comme \u00e9tats Plane \u2014 statuts d\u00e9taill\u00e9s conserv\u00e9s en \u00e9tiquettes)','docker-ps':'docker ps --format {{.Names}}\\t{{.Status}}','flowable-instances':"curl -u rest-admin:test http://localhost:8081/flowable-rest/service/runtime/process-instances",'jira-count':"curl -u azurea:*** http://74.162.153.131:8080/rest/api/2/search?jql=project=OCP",'plane-count':'psql: SELECT state, count(*) FROM issues GROUP BY state'};
 var out=document.getElementById('out'),inp=document.getElementById('inp'),btn=document.getElementById('run'),chips=document.getElementById('chips');
 Object.keys(CMDS).forEach(function(id){var b=document.createElement('button');b.className='chip';b.textContent=id;b.title=CMDS[id];b.onclick=function(){inp.value=id;[].forEach.call(document.querySelectorAll('.chip'),function(c){c.classList.remove('on')});b.classList.add('on')};chips.appendChild(b)});
 function line(txt,cls){var s=document.createElement('span');if(cls)s.className=cls;s.textContent=txt+String.fromCharCode(10);out.appendChild(s);out.scrollTop=out.scrollHeight;return s}
@@ -791,11 +791,11 @@ const server = http.createServer(async (req, res) => {
       const raw = await new Promise(r2 => { let d = ''; req.on('data', c => d += c); req.on('end', () => r2(d)); });
       let id = null; try { id = JSON.parse(raw || '{}').id; } catch (e) { }
       if (!id) return json(res, 400, { error: 'missing id' });
-      const bulk = (id === 'jira-import' || id === 'jira-import-wipe');
+      const bulk = (id === 'jira-import' || id === 'jira-import-wipe' || id === 'jira-import-phases');
       if (bulk) SUPPRESS_WEBHOOK = true;
       try {
         const out = await agentRun(id);
-        if (out && out.exit === 0 && ['workflow-migrate', 'jira-dry', 'jira-import', 'jira-import-wipe'].indexOf(id) !== -1) MIGRATED = true;
+        if (out && out.exit === 0 && ['workflow-migrate', 'jira-dry', 'jira-import', 'jira-import-wipe', 'jira-import-phases'].indexOf(id) !== -1) MIGRATED = true;
         return json(res, 200, out);
       } catch (e) { return json(res, 502, { error: e.message.slice(0, 160) }); } finally { if (bulk) setTimeout(function () { SUPPRESS_WEBHOOK = false; log('fenetre de suppression webhook fermee (90s)'); }, 90000); }
     }
