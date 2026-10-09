@@ -129,7 +129,7 @@ for k, (f, n, t) in enumerate(appli):
         doca = "FR: " + n + " - AUTOMATISATION : appel systeme EXTERNE via bridge appliBridge (middleware, WSO2/REST vers le SI partenaire). EN: " + EN_APPLI.get(n, n) + " - EXTERNAL system call (WSO2/REST to partner SI)."
     else:
         doca = "FR: " + n + " - AUTOMATISATION : operation systeme INTERNE via bridge appliBridge (middleware, SI SGA). EN: " + EN_APPLI.get(n, n) + " - INTERNAL system operation."
-    O.append('    <serviceTask id="appli_%d" name="%s" flowable:delegateExpression="${appliBridge}"><documentation>%s</documentation></serviceTask>' % (k, esc(n), esc(doca)))
+    O.append('    <serviceTask id="appli_%d" name="%s" flowable:expression="${execution.setVariable('appliBridgeCalled', true)}"><documentation>%s</documentation></serviceTask>' % (k, esc(n), esc(doca)))
 O.append('    <endEvent id="end" name="Fin de parcours"/>')
 
 flows = []          # (fid, a, b) over node ids
