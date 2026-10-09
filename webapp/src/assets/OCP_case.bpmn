@@ -49,120 +49,120 @@
     <serviceTask id="appli_10" name="[APPLI] - Garanties à recueillir" flowable:delegateExpression="${appliBridge}"><documentation>FR: [APPLI] - Garanties à recueillir - AUTOMATISATION : operation systeme INTERNE via bridge appliBridge (middleware, SI SGA). EN: [APPLI] - Collaterals to be collected - INTERNAL system operation.</documentation></serviceTask>
     <serviceTask id="appli_11" name="[APPLI] - Auto Fournir infos supp APPLI/POS" flowable:delegateExpression="${appliBridge}"><documentation>FR: [APPLI] - Auto Fournir infos supp APPLI/POS - AUTOMATISATION : operation systeme INTERNE via bridge appliBridge (middleware, SI SGA). EN: [APPLI] - Auto-provide additional APPLI/POS info - INTERNAL system operation.</documentation></serviceTask>
     <endEvent id="end" name="Fin de parcours"/>
-    <sequenceFlow id="flow_1" sourceRef="start" targetRef="task_26""/>
-    <sequenceFlow id="flow_2" sourceRef="task_8" targetRef="appli_0" name="[APPLI] - Soumettre pour décision""/>
-    <sequenceFlow id="flow_3" sourceRef="appli_0" targetRef="task_10""/>
-    <sequenceFlow id="flow_4" sourceRef="task_8" targetRef="appli_1" name="[APPLI] - Demande refusée""/>
-    <sequenceFlow id="flow_5" sourceRef="appli_1" targetRef="task_9""/>
-    <sequenceFlow id="flow_6" sourceRef="task_10" targetRef="appli_2" name="[APPLI] - Décision""/>
-    <sequenceFlow id="flow_7" sourceRef="appli_2" targetRef="task_14""/>
-    <sequenceFlow id="flow_8" sourceRef="task_10" targetRef="appli_3" name="[APPLI] - Défavorable""/>
-    <sequenceFlow id="flow_9" sourceRef="appli_3" targetRef="task_12""/>
-    <sequenceFlow id="flow_10" sourceRef="task_12" targetRef="appli_4" name="[APPLI] - Attente décision""/>
-    <sequenceFlow id="flow_11" sourceRef="appli_4" targetRef="task_10""/>
-    <sequenceFlow id="flow_12" sourceRef="task_14" targetRef="appli_5" name="[APPLI] - Constituer dossier - Demander garanties""/>
-    <sequenceFlow id="flow_13" sourceRef="appli_5" targetRef="task_17""/>
-    <sequenceFlow id="flow_14" sourceRef="task_17" targetRef="appli_6" name="[APPLI] - Garanties reçues""/>
-    <sequenceFlow id="flow_15" sourceRef="appli_6" targetRef="task_18""/>
-    <sequenceFlow id="flow_16" sourceRef="task_18" targetRef="appli_7" name="[APPLI] - Décaisser dossier""/>
-    <sequenceFlow id="flow_17" sourceRef="appli_7" targetRef="task_23""/>
-    <sequenceFlow id="flow_18" sourceRef="task_26" targetRef="appli_8" name="[APPLI] - Compléter la demande""/>
-    <sequenceFlow id="flow_19" sourceRef="appli_8" targetRef="task_8""/>
-    <sequenceFlow id="flow_20" sourceRef="task_26" targetRef="appli_9" name="[APPLI] - Test TNR APPLI""/>
-    <sequenceFlow id="flow_21" sourceRef="appli_9" targetRef="task_26""/>
-    <sequenceFlow id="flow_22" sourceRef="task_30" targetRef="appli_10" name="[APPLI] - Garanties à recueillir""/>
-    <sequenceFlow id="flow_23" sourceRef="appli_10" targetRef="task_17""/>
-    <sequenceFlow id="flow_24" sourceRef="task_34" targetRef="appli_11" name="[APPLI] - Auto Fournir infos supp APPLI/POS""/>
-    <sequenceFlow id="flow_25" sourceRef="appli_11" targetRef="task_8""/>
-    <sequenceFlow id="flow_26" sourceRef="task_5" targetRef="task_5" name="Questionnaire médical AXA""/>
-    <sequenceFlow id="flow_27" sourceRef="task_5" targetRef="task_11" name="Auto Demande initiée""/>
-    <sequenceFlow id="flow_28" sourceRef="task_5" targetRef="task_8" name="Auto Demande en étude""/>
-    <sequenceFlow id="flow_29" sourceRef="task_8" targetRef="task_8" name="Refaire simulation""/>
-    <sequenceFlow id="flow_30" sourceRef="task_8" targetRef="task_10" name="Soumettre pour décision""/>
-    <sequenceFlow id="flow_31" sourceRef="task_8" targetRef="task_26" name="Auto Demande reçue""/>
-    <sequenceFlow id="flow_32" sourceRef="task_8" targetRef="task_9" name="Auto Demande refusée""/>
-    <sequenceFlow id="flow_33" sourceRef="task_8" targetRef="task_35" name="Auto Demande incomplète""/>
-    <sequenceFlow id="flow_34" sourceRef="task_8" targetRef="task_42" name="Auto En attente de signature""/>
-    <sequenceFlow id="flow_35" sourceRef="task_9" targetRef="task_8" name="Re Demande en étude""/>
-    <sequenceFlow id="flow_36" sourceRef="task_10" targetRef="task_10" name="Décision""/>
-    <sequenceFlow id="flow_37" sourceRef="task_10" targetRef="task_12" name="Auto Défavorable""/>
-    <sequenceFlow id="flow_38" sourceRef="task_10" targetRef="task_11" name="Auto Favorable""/>
-    <sequenceFlow id="flow_39" sourceRef="task_10" targetRef="task_13" name="Demander infos supp""/>
-    <sequenceFlow id="flow_40" sourceRef="task_10" targetRef="task_27" name="Auto Dérogation demandée""/>
-    <sequenceFlow id="flow_41" sourceRef="task_11" targetRef="task_14" name="Prendre en compte""/>
-    <sequenceFlow id="flow_42" sourceRef="task_13" targetRef="task_10" name="Fournir infos supp""/>
-    <sequenceFlow id="flow_43" sourceRef="task_14" targetRef="task_12" name="Rejeter la demande""/>
-    <sequenceFlow id="flow_44" sourceRef="task_14" targetRef="task_14" name="Demander infos supp""/>
-    <sequenceFlow id="flow_45" sourceRef="task_14" targetRef="task_15" name="Auto Montage à refaire""/>
-    <sequenceFlow id="flow_46" sourceRef="task_14" targetRef="task_16" name="Auto Attente infos supp BO""/>
-    <sequenceFlow id="flow_47" sourceRef="task_14" targetRef="task_20" name="Auto Constituer le dossier""/>
-    <sequenceFlow id="flow_48" sourceRef="task_14" targetRef="task_5" name="Attente retour AXA""/>
-    <sequenceFlow id="flow_49" sourceRef="task_15" targetRef="task_8" name="Refaire le montage""/>
-    <sequenceFlow id="flow_50" sourceRef="task_16" targetRef="task_11" name="Fournir infos supp""/>
-    <sequenceFlow id="flow_51" sourceRef="task_17" targetRef="task_18" name="Auto Garanties reçues""/>
-    <sequenceFlow id="flow_52" sourceRef="task_17" targetRef="task_14" name="re_etude_en_cours""/>
-    <sequenceFlow id="flow_53" sourceRef="task_18" targetRef="task_19" name="Auto Attente complément""/>
-    <sequenceFlow id="flow_54" sourceRef="task_18" targetRef="task_21" name="Auto Garantie pré-validée""/>
-    <sequenceFlow id="flow_55" sourceRef="task_19" targetRef="task_18" name="Auto Garanties reçues""/>
-    <sequenceFlow id="flow_56" sourceRef="task_19" targetRef="task_21" name="Auto Garanties pré-validée""/>
-    <sequenceFlow id="flow_57" sourceRef="task_20" targetRef="task_17" name="Auto Demander garanties""/>
-    <sequenceFlow id="flow_58" sourceRef="task_21" targetRef="task_21" name="Valider dossier""/>
-    <sequenceFlow id="flow_59" sourceRef="task_21" targetRef="task_22" name="Demander info supp garantie""/>
-    <sequenceFlow id="flow_60" sourceRef="task_21" targetRef="task_25" name="Auto Garantie validée""/>
-    <sequenceFlow id="flow_61" sourceRef="task_21" targetRef="task_31" name="Auto Décaissement Manuel""/>
-    <sequenceFlow id="flow_62" sourceRef="task_22" targetRef="task_21" name="Transmettre Infos Supp garantie""/>
-    <sequenceFlow id="flow_63" sourceRef="task_23" targetRef="task_23" name="Auto Générer avis crédit fournisseur""/>
-    <sequenceFlow id="flow_64" sourceRef="task_23" targetRef="task_31" name="re Dossier à décaisser""/>
-    <sequenceFlow id="flow_65" sourceRef="task_25" targetRef="task_25" name="Auto Décaissement SMG""/>
-    <sequenceFlow id="flow_66" sourceRef="task_25" targetRef="task_31" name="Auto Dossier à décaisser""/>
-    <sequenceFlow id="flow_67" sourceRef="task_25" targetRef="task_23" name="Auto Dossier décaissé""/>
-    <sequenceFlow id="flow_68" sourceRef="task_26" targetRef="task_8" name="Compléter la demande""/>
-    <sequenceFlow id="flow_69" sourceRef="task_27" targetRef="task_11" name="Autoriser le dossier""/>
-    <sequenceFlow id="flow_70" sourceRef="task_27" targetRef="task_27" name="Demander infos supp""/>
-    <sequenceFlow id="flow_71" sourceRef="task_27" targetRef="task_29" name="Auto Attente info supp RUC""/>
-    <sequenceFlow id="flow_72" sourceRef="task_27" targetRef="task_28" name="Auto Attente info supp DR""/>
-    <sequenceFlow id="flow_73" sourceRef="task_27" targetRef="task_12" name="Rejeter le dossier""/>
-    <sequenceFlow id="flow_74" sourceRef="task_28" targetRef="task_27" name="Fournir infos supp""/>
-    <sequenceFlow id="flow_75" sourceRef="task_29" targetRef="task_27" name="Fournir infos supp""/>
-    <sequenceFlow id="flow_76" sourceRef="task_31" targetRef="task_21" name="Retour Garantie pré-validée""/>
-    <sequenceFlow id="flow_77" sourceRef="task_31" targetRef="task_41" name="Auto Décaissement Partielle""/>
-    <sequenceFlow id="flow_78" sourceRef="task_31" targetRef="task_31" name="Décaissement""/>
-    <sequenceFlow id="flow_79" sourceRef="task_33" targetRef="task_26" name="Auto Demande Reçue ""/>
-    <sequenceFlow id="flow_80" sourceRef="task_33" targetRef="task_8" name="Auto Demande en étude""/>
-    <sequenceFlow id="flow_81" sourceRef="task_33" targetRef="task_13" name="Auto Attente infos Supp Décisionnaire""/>
-    <sequenceFlow id="flow_82" sourceRef="task_33" targetRef="task_10" name="Auto Attente décision""/>
-    <sequenceFlow id="flow_83" sourceRef="task_33" targetRef="task_29" name="Auto Attente Info Supp RUC""/>
-    <sequenceFlow id="flow_84" sourceRef="task_33" targetRef="task_28" name="Auto Attente Info Supp DR""/>
-    <sequenceFlow id="flow_85" sourceRef="task_33" targetRef="task_16" name="Auto Attente info supp BO""/>
-    <sequenceFlow id="flow_86" sourceRef="task_33" targetRef="task_19" name="Auto Attente complément""/>
-    <sequenceFlow id="flow_87" sourceRef="task_33" targetRef="task_22" name="Auto Attente info supp garantie""/>
-    <sequenceFlow id="flow_88" sourceRef="task_33" targetRef="task_11" name="Auto Demande initiée""/>
-    <sequenceFlow id="flow_89" sourceRef="task_33" targetRef="task_15" name="Auto Montage à refaire""/>
-    <sequenceFlow id="flow_90" sourceRef="task_33" targetRef="task_27" name="Auto Dérogation demandée""/>
-    <sequenceFlow id="flow_91" sourceRef="task_33" targetRef="task_14" name="Auto Etude en cours""/>
-    <sequenceFlow id="flow_92" sourceRef="task_33" targetRef="task_20" name="Auto Dossier Constitué""/>
-    <sequenceFlow id="flow_93" sourceRef="task_33" targetRef="task_5" name="Auto Attente AXA""/>
-    <sequenceFlow id="flow_94" sourceRef="task_33" targetRef="task_17" name="Auto Garanties à recueillir""/>
-    <sequenceFlow id="flow_95" sourceRef="task_33" targetRef="task_21" name="Auto Garantie pré-validée""/>
-    <sequenceFlow id="flow_96" sourceRef="task_33" targetRef="task_18" name="Auto Garanties reçues""/>
-    <sequenceFlow id="flow_97" sourceRef="task_33" targetRef="task_34" name="Auto Attente Info supp APPLI/POS""/>
-    <sequenceFlow id="flow_98" sourceRef="task_34" targetRef="task_28" name="Auto Attente Info Supp DR""/>
-    <sequenceFlow id="flow_99" sourceRef="task_34" targetRef="task_13" name="Auto Attente Infos Supp Décisionnaire""/>
-    <sequenceFlow id="flow_100" sourceRef="task_34" targetRef="task_16" name="Auto Attente Infos Supp BO""/>
-    <sequenceFlow id="flow_101" sourceRef="task_34" targetRef="task_29" name="Auto Attente Info Supp RUC""/>
-    <sequenceFlow id="flow_102" sourceRef="task_34" targetRef="task_8" name="Auto Demande en étude""/>
-    <sequenceFlow id="flow_103" sourceRef="task_35" targetRef="task_26" name="Auto Demande Reçue ""/>
-    <sequenceFlow id="flow_104" sourceRef="task_36" targetRef="task_37" name="Recevoir dossier""/>
-    <sequenceFlow id="flow_105" sourceRef="task_36" targetRef="task_36" name="Demander remboursement""/>
-    <sequenceFlow id="flow_106" sourceRef="task_37" targetRef="task_38" name="Valider contrôle""/>
-    <sequenceFlow id="flow_107" sourceRef="task_37" targetRef="task_39" name="Demander des compléments""/>
-    <sequenceFlow id="flow_108" sourceRef="task_38" targetRef="task_38" name="Demander remboursement""/>
-    <sequenceFlow id="flow_109" sourceRef="task_39" targetRef="task_37" name="Fournir les compléments""/>
-    <sequenceFlow id="flow_110" sourceRef="task_39" targetRef="task_39" name="Demander remboursement""/>
-    <sequenceFlow id="flow_111" sourceRef="task_41" targetRef="task_41" name="Transmettre dossier physique""/>
-    <sequenceFlow id="flow_112" sourceRef="task_41" targetRef="task_23" name="Auto Dossier Décaissé Totalement""/>
-    <sequenceFlow id="flow_113" sourceRef="task_42" targetRef="task_8" name="Annuler demande de signature""/>
-    <sequenceFlow id="flow_114" sourceRef="task_40" targetRef="end""/>
+    <sequenceFlow id="flow_1" sourceRef="start" targetRef="task_26"/>
+    <sequenceFlow id="flow_2" sourceRef="task_8" targetRef="appli_0" name="[APPLI] - Soumettre pour décision"/>
+    <sequenceFlow id="flow_3" sourceRef="appli_0" targetRef="task_10"/>
+    <sequenceFlow id="flow_4" sourceRef="task_8" targetRef="appli_1" name="[APPLI] - Demande refusée"/>
+    <sequenceFlow id="flow_5" sourceRef="appli_1" targetRef="task_9"/>
+    <sequenceFlow id="flow_6" sourceRef="task_10" targetRef="appli_2" name="[APPLI] - Décision"/>
+    <sequenceFlow id="flow_7" sourceRef="appli_2" targetRef="task_14"/>
+    <sequenceFlow id="flow_8" sourceRef="task_10" targetRef="appli_3" name="[APPLI] - Défavorable"/>
+    <sequenceFlow id="flow_9" sourceRef="appli_3" targetRef="task_12"/>
+    <sequenceFlow id="flow_10" sourceRef="task_12" targetRef="appli_4" name="[APPLI] - Attente décision"/>
+    <sequenceFlow id="flow_11" sourceRef="appli_4" targetRef="task_10"/>
+    <sequenceFlow id="flow_12" sourceRef="task_14" targetRef="appli_5" name="[APPLI] - Constituer dossier - Demander garanties"/>
+    <sequenceFlow id="flow_13" sourceRef="appli_5" targetRef="task_17"/>
+    <sequenceFlow id="flow_14" sourceRef="task_17" targetRef="appli_6" name="[APPLI] - Garanties reçues"/>
+    <sequenceFlow id="flow_15" sourceRef="appli_6" targetRef="task_18"/>
+    <sequenceFlow id="flow_16" sourceRef="task_18" targetRef="appli_7" name="[APPLI] - Décaisser dossier"/>
+    <sequenceFlow id="flow_17" sourceRef="appli_7" targetRef="task_23"/>
+    <sequenceFlow id="flow_18" sourceRef="task_26" targetRef="appli_8" name="[APPLI] - Compléter la demande"/>
+    <sequenceFlow id="flow_19" sourceRef="appli_8" targetRef="task_8"/>
+    <sequenceFlow id="flow_20" sourceRef="task_26" targetRef="appli_9" name="[APPLI] - Test TNR APPLI"/>
+    <sequenceFlow id="flow_21" sourceRef="appli_9" targetRef="task_26"/>
+    <sequenceFlow id="flow_22" sourceRef="task_30" targetRef="appli_10" name="[APPLI] - Garanties à recueillir"/>
+    <sequenceFlow id="flow_23" sourceRef="appli_10" targetRef="task_17"/>
+    <sequenceFlow id="flow_24" sourceRef="task_34" targetRef="appli_11" name="[APPLI] - Auto Fournir infos supp APPLI/POS"/>
+    <sequenceFlow id="flow_25" sourceRef="appli_11" targetRef="task_8"/>
+    <sequenceFlow id="flow_26" sourceRef="task_5" targetRef="task_5" name="Questionnaire médical AXA"/>
+    <sequenceFlow id="flow_27" sourceRef="task_5" targetRef="task_11" name="Auto Demande initiée"/>
+    <sequenceFlow id="flow_28" sourceRef="task_5" targetRef="task_8" name="Auto Demande en étude"/>
+    <sequenceFlow id="flow_29" sourceRef="task_8" targetRef="task_8" name="Refaire simulation"/>
+    <sequenceFlow id="flow_30" sourceRef="task_8" targetRef="task_10" name="Soumettre pour décision"/>
+    <sequenceFlow id="flow_31" sourceRef="task_8" targetRef="task_26" name="Auto Demande reçue"/>
+    <sequenceFlow id="flow_32" sourceRef="task_8" targetRef="task_9" name="Auto Demande refusée"/>
+    <sequenceFlow id="flow_33" sourceRef="task_8" targetRef="task_35" name="Auto Demande incomplète"/>
+    <sequenceFlow id="flow_34" sourceRef="task_8" targetRef="task_42" name="Auto En attente de signature"/>
+    <sequenceFlow id="flow_35" sourceRef="task_9" targetRef="task_8" name="Re Demande en étude"/>
+    <sequenceFlow id="flow_36" sourceRef="task_10" targetRef="task_10" name="Décision"/>
+    <sequenceFlow id="flow_37" sourceRef="task_10" targetRef="task_12" name="Auto Défavorable"/>
+    <sequenceFlow id="flow_38" sourceRef="task_10" targetRef="task_11" name="Auto Favorable"/>
+    <sequenceFlow id="flow_39" sourceRef="task_10" targetRef="task_13" name="Demander infos supp"/>
+    <sequenceFlow id="flow_40" sourceRef="task_10" targetRef="task_27" name="Auto Dérogation demandée"/>
+    <sequenceFlow id="flow_41" sourceRef="task_11" targetRef="task_14" name="Prendre en compte"/>
+    <sequenceFlow id="flow_42" sourceRef="task_13" targetRef="task_10" name="Fournir infos supp"/>
+    <sequenceFlow id="flow_43" sourceRef="task_14" targetRef="task_12" name="Rejeter la demande"/>
+    <sequenceFlow id="flow_44" sourceRef="task_14" targetRef="task_14" name="Demander infos supp"/>
+    <sequenceFlow id="flow_45" sourceRef="task_14" targetRef="task_15" name="Auto Montage à refaire"/>
+    <sequenceFlow id="flow_46" sourceRef="task_14" targetRef="task_16" name="Auto Attente infos supp BO"/>
+    <sequenceFlow id="flow_47" sourceRef="task_14" targetRef="task_20" name="Auto Constituer le dossier"/>
+    <sequenceFlow id="flow_48" sourceRef="task_14" targetRef="task_5" name="Attente retour AXA"/>
+    <sequenceFlow id="flow_49" sourceRef="task_15" targetRef="task_8" name="Refaire le montage"/>
+    <sequenceFlow id="flow_50" sourceRef="task_16" targetRef="task_11" name="Fournir infos supp"/>
+    <sequenceFlow id="flow_51" sourceRef="task_17" targetRef="task_18" name="Auto Garanties reçues"/>
+    <sequenceFlow id="flow_52" sourceRef="task_17" targetRef="task_14" name="re_etude_en_cours"/>
+    <sequenceFlow id="flow_53" sourceRef="task_18" targetRef="task_19" name="Auto Attente complément"/>
+    <sequenceFlow id="flow_54" sourceRef="task_18" targetRef="task_21" name="Auto Garantie pré-validée"/>
+    <sequenceFlow id="flow_55" sourceRef="task_19" targetRef="task_18" name="Auto Garanties reçues"/>
+    <sequenceFlow id="flow_56" sourceRef="task_19" targetRef="task_21" name="Auto Garanties pré-validée"/>
+    <sequenceFlow id="flow_57" sourceRef="task_20" targetRef="task_17" name="Auto Demander garanties"/>
+    <sequenceFlow id="flow_58" sourceRef="task_21" targetRef="task_21" name="Valider dossier"/>
+    <sequenceFlow id="flow_59" sourceRef="task_21" targetRef="task_22" name="Demander info supp garantie"/>
+    <sequenceFlow id="flow_60" sourceRef="task_21" targetRef="task_25" name="Auto Garantie validée"/>
+    <sequenceFlow id="flow_61" sourceRef="task_21" targetRef="task_31" name="Auto Décaissement Manuel"/>
+    <sequenceFlow id="flow_62" sourceRef="task_22" targetRef="task_21" name="Transmettre Infos Supp garantie"/>
+    <sequenceFlow id="flow_63" sourceRef="task_23" targetRef="task_23" name="Auto Générer avis crédit fournisseur"/>
+    <sequenceFlow id="flow_64" sourceRef="task_23" targetRef="task_31" name="re Dossier à décaisser"/>
+    <sequenceFlow id="flow_65" sourceRef="task_25" targetRef="task_25" name="Auto Décaissement SMG"/>
+    <sequenceFlow id="flow_66" sourceRef="task_25" targetRef="task_31" name="Auto Dossier à décaisser"/>
+    <sequenceFlow id="flow_67" sourceRef="task_25" targetRef="task_23" name="Auto Dossier décaissé"/>
+    <sequenceFlow id="flow_68" sourceRef="task_26" targetRef="task_8" name="Compléter la demande"/>
+    <sequenceFlow id="flow_69" sourceRef="task_27" targetRef="task_11" name="Autoriser le dossier"/>
+    <sequenceFlow id="flow_70" sourceRef="task_27" targetRef="task_27" name="Demander infos supp"/>
+    <sequenceFlow id="flow_71" sourceRef="task_27" targetRef="task_29" name="Auto Attente info supp RUC"/>
+    <sequenceFlow id="flow_72" sourceRef="task_27" targetRef="task_28" name="Auto Attente info supp DR"/>
+    <sequenceFlow id="flow_73" sourceRef="task_27" targetRef="task_12" name="Rejeter le dossier"/>
+    <sequenceFlow id="flow_74" sourceRef="task_28" targetRef="task_27" name="Fournir infos supp"/>
+    <sequenceFlow id="flow_75" sourceRef="task_29" targetRef="task_27" name="Fournir infos supp"/>
+    <sequenceFlow id="flow_76" sourceRef="task_31" targetRef="task_21" name="Retour Garantie pré-validée"/>
+    <sequenceFlow id="flow_77" sourceRef="task_31" targetRef="task_41" name="Auto Décaissement Partielle"/>
+    <sequenceFlow id="flow_78" sourceRef="task_31" targetRef="task_31" name="Décaissement"/>
+    <sequenceFlow id="flow_79" sourceRef="task_33" targetRef="task_26" name="Auto Demande Reçue "/>
+    <sequenceFlow id="flow_80" sourceRef="task_33" targetRef="task_8" name="Auto Demande en étude"/>
+    <sequenceFlow id="flow_81" sourceRef="task_33" targetRef="task_13" name="Auto Attente infos Supp Décisionnaire"/>
+    <sequenceFlow id="flow_82" sourceRef="task_33" targetRef="task_10" name="Auto Attente décision"/>
+    <sequenceFlow id="flow_83" sourceRef="task_33" targetRef="task_29" name="Auto Attente Info Supp RUC"/>
+    <sequenceFlow id="flow_84" sourceRef="task_33" targetRef="task_28" name="Auto Attente Info Supp DR"/>
+    <sequenceFlow id="flow_85" sourceRef="task_33" targetRef="task_16" name="Auto Attente info supp BO"/>
+    <sequenceFlow id="flow_86" sourceRef="task_33" targetRef="task_19" name="Auto Attente complément"/>
+    <sequenceFlow id="flow_87" sourceRef="task_33" targetRef="task_22" name="Auto Attente info supp garantie"/>
+    <sequenceFlow id="flow_88" sourceRef="task_33" targetRef="task_11" name="Auto Demande initiée"/>
+    <sequenceFlow id="flow_89" sourceRef="task_33" targetRef="task_15" name="Auto Montage à refaire"/>
+    <sequenceFlow id="flow_90" sourceRef="task_33" targetRef="task_27" name="Auto Dérogation demandée"/>
+    <sequenceFlow id="flow_91" sourceRef="task_33" targetRef="task_14" name="Auto Etude en cours"/>
+    <sequenceFlow id="flow_92" sourceRef="task_33" targetRef="task_20" name="Auto Dossier Constitué"/>
+    <sequenceFlow id="flow_93" sourceRef="task_33" targetRef="task_5" name="Auto Attente AXA"/>
+    <sequenceFlow id="flow_94" sourceRef="task_33" targetRef="task_17" name="Auto Garanties à recueillir"/>
+    <sequenceFlow id="flow_95" sourceRef="task_33" targetRef="task_21" name="Auto Garantie pré-validée"/>
+    <sequenceFlow id="flow_96" sourceRef="task_33" targetRef="task_18" name="Auto Garanties reçues"/>
+    <sequenceFlow id="flow_97" sourceRef="task_33" targetRef="task_34" name="Auto Attente Info supp APPLI/POS"/>
+    <sequenceFlow id="flow_98" sourceRef="task_34" targetRef="task_28" name="Auto Attente Info Supp DR"/>
+    <sequenceFlow id="flow_99" sourceRef="task_34" targetRef="task_13" name="Auto Attente Infos Supp Décisionnaire"/>
+    <sequenceFlow id="flow_100" sourceRef="task_34" targetRef="task_16" name="Auto Attente Infos Supp BO"/>
+    <sequenceFlow id="flow_101" sourceRef="task_34" targetRef="task_29" name="Auto Attente Info Supp RUC"/>
+    <sequenceFlow id="flow_102" sourceRef="task_34" targetRef="task_8" name="Auto Demande en étude"/>
+    <sequenceFlow id="flow_103" sourceRef="task_35" targetRef="task_26" name="Auto Demande Reçue "/>
+    <sequenceFlow id="flow_104" sourceRef="task_36" targetRef="task_37" name="Recevoir dossier"/>
+    <sequenceFlow id="flow_105" sourceRef="task_36" targetRef="task_36" name="Demander remboursement"/>
+    <sequenceFlow id="flow_106" sourceRef="task_37" targetRef="task_38" name="Valider contrôle"/>
+    <sequenceFlow id="flow_107" sourceRef="task_37" targetRef="task_39" name="Demander des compléments"/>
+    <sequenceFlow id="flow_108" sourceRef="task_38" targetRef="task_38" name="Demander remboursement"/>
+    <sequenceFlow id="flow_109" sourceRef="task_39" targetRef="task_37" name="Fournir les compléments"/>
+    <sequenceFlow id="flow_110" sourceRef="task_39" targetRef="task_39" name="Demander remboursement"/>
+    <sequenceFlow id="flow_111" sourceRef="task_41" targetRef="task_41" name="Transmettre dossier physique"/>
+    <sequenceFlow id="flow_112" sourceRef="task_41" targetRef="task_23" name="Auto Dossier Décaissé Totalement"/>
+    <sequenceFlow id="flow_113" sourceRef="task_42" targetRef="task_8" name="Annuler demande de signature"/>
+    <sequenceFlow id="flow_114" sourceRef="task_40" targetRef="end"/>
   </process>
   <bpmndi:BPMNDiagram id="Diagram_1">
     <bpmndi:BPMNPlane id="Plane_1" bpmnElement="OCP_case">

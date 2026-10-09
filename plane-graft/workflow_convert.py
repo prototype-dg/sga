@@ -145,7 +145,7 @@ def flow(a, b, name=None):
     seen_pair.add(key)
     fid = 'flow_%d' % (len(flows) + 1)
     nattr = (' name="%s"' % esc(name)) if name else ''
-    O.append('    <sequenceFlow id="%s" sourceRef="%s" targetRef="%s"%s"/>' % (fid, a, b, nattr))
+    O.append('    <sequenceFlow id="%s" sourceRef="%s" targetRef="%s"%s/>' % (fid, a, b, nattr))
     flows.append((fid, a, b))
 
 
