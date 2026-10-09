@@ -323,11 +323,9 @@ select{background:#0c0c10;color:#e8e6e1;border:1px solid #2a2a33;border-radius:6
 .bjs-active circle{fill:#E9041E !important;fill-opacity:.4 !important}
 
 .t-auto .djs-label{fill:#fff !important}
-.lbl-light .djs-label,.djs-label{fill:#e8e6e1 !important;paint-order:stroke !important;stroke:#0c0c10 !important;stroke-width:3px !important;stroke-linejoin:round !important}
-.t-ext rect{fill:#ffffff !important;stroke:#E9041E !important;stroke-width:3px !important}
-.t-int rect{fill:#ffffff !important;stroke:#E9741E !important;stroke-width:3px !important}
-.t-ext .djs-label,.t-ext text.djs-label{fill:#C40018 !important;font-size:11.5px !important;font-weight:700 !important}
-.t-int .djs-label,.t-int text.djs-label{fill:#B35809 !important;font-size:11.5px !important;font-weight:700 !important}
+.lbl-light .djs-label{fill:#e8e6e1 !important;paint-order:stroke !important;stroke:#0c0c10 !important;stroke-width:3px !important;stroke-linejoin:round !important}
+.t-ext .djs-label,.t-ext text.djs-label{fill:#B00016 !important;stroke:none !important;font-size:12px !important;font-weight:700 !important}
+.t-int .djs-label,.t-int text.djs-label{fill:#9a4d06 !important;stroke:none !important;font-size:12px !important;font-weight:700 !important}
 .t-manual .djs-label,.t-manual text.djs-label{fill:#111 !important;paint-order:stroke !important;stroke:#ffffff !important;stroke-width:2.5px !important}
 .lbl-hide{display:none !important}
 .zbar{position:absolute;top:10px;right:12px;display:flex;gap:6px;z-index:10}
@@ -336,9 +334,13 @@ select{background:#0c0c10;color:#e8e6e1;border:1px solid #2a2a33;border-radius:6
 .legend{display:flex;gap:14px;align-items:center;color:#9a9a9a;font-size:11px;margin-top:6px}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
 .legend i.m{background:#fff}.legend i.a{background:#E9041E}.legend i.i{background:#E9741E}
+.djs-connection .djs-visual path{stroke:#b9bec9 !important;stroke-width:1.7px !important}
+svg defs marker path{fill:#b9bec9 !important;stroke:#b9bec9 !important}
+.edge-name{fill:#e8e6e1 !important;font-size:10px;font-weight:600;font-family:Montserrat,system-ui,sans-serif}
+.edge-plate{fill:#14141a;opacity:.92}
 </style></head><body>
 <h1><span class="dot"></span>SGA Process Inspector — Octroi de Crédit</h1>
-<div class="sub"><span style="color:#6f6f78;font-size:10px;border:1px solid #2a2a33;border-radius:4px;padding:1px 6px">build 2026-10-09.3</span> Ce qui se passe DERRIÈRE chaque action : moteur Flowable en direct — étape courante du processus, historique d'exécution, variables du dossier, journal d'appels de la couche d'intégration.</div>
+<div class="sub"><span style="color:#6f6f78;font-size:10px;border:1px solid #2a2a33;border-radius:4px;padding:1px 6px">build 2026-10-09.4</span> Ce qui se passe DERRIÈRE chaque action : moteur Flowable en direct — étape courante du processus, historique d'exécution, variables du dossier, journal d'appels de la couche d'intégration.</div>
 <div class="grid"><div class="panel"><h2>Processus (BPMN)</h2><div style="position:relative"><div class="zbar"><button title="Zoom + (touche +)" onclick="zzoom(1.25)">+</button><button title="Zoom − (touche -)" onclick="zzoom(0.8)">−</button><button title="Ajuster (touche 0)" style="width:auto;padding:0 10px;font-size:11px" onclick="zfit()">fit</button></div><div id="canvas"></div></div><div class="legend"><span><i class="m"></i>Manuelle (agent)</span><span><i class="a"></i>Auto — appel externe (EN: external call)</span><span><i class="i"></i>Auto — interne (EN: internal)</span><span>Cliquez une étape pour le détail</span></div></div>
 <div><div class="panel"><h2>Dossiers en cours (Flowable)</h2><select id="inst"><option value="">— chargement…</option></select><button class="btn" onclick="load()">Inspecter</button></div>
 <div class="panel" style="margin-top:12px"><h2>Étapes du parcours</h2><div class="tl" id="tl"><span class="empty">Choisissez un dossier puis « Inspecter ».</span></div></div>
@@ -350,6 +352,7 @@ function showErr(m){var c=document.getElementById('canvas');if(c)c.innerHTML='<d
 var modelLoaded=false;
 function zzoom(f){try{var cv=viewer.get('canvas');cv.zoom(cv.zoom()*f)}catch(e){}}
 function zfit(){try{viewer.get('canvas').zoom('fit-viewport')}catch(e){}}
+function edgeLabels(){try{var NS='http://www.w3.org/2000/svg';var cont=viewer.get('canvas').getContainer();var svg=cont.querySelector('svg');if(!svg)return;var old=svg.querySelector('.edge-names');if(old)old.parentNode.removeChild(old);var g=document.createElementNS(NS,'g');g.setAttribute('class','edge-names');var reg=viewer.get('elementRegistry');var n=0;reg.getAll().forEach(function(el){if(el.type!=='bpmn:SequenceFlow')return;var nm=(el.businessObject&&el.businessObject.name)||'';if(!nm)return;var wps=el.waypoints;if(!wps||wps.length<2)return;var segs=[],L=0,i;for(i=1;i<wps.length;i++){var dx=wps[i].x-wps[i-1].x,dy=wps[i].y-wps[i-1].y;var l=Math.sqrt(dx*dx+dy*dy)||0.0001;segs.push({l:l,a:Math.atan2(dy,dx)*180/Math.PI,x1:wps[i-1].x,y1:wps[i-1].y,x2:wps[i].x,y2:wps[i].y});L+=l}var half=L/2,pt=null,ang=0;for(i=0;i<segs.length;i++){if(half<=segs[i].l){var t=half/segs[i].l;pt={x:segs[i].x1+(segs[i].x2-segs[i].x1)*t,y:segs[i].y1+(segs[i].y2-segs[i].y1)*t};ang=segs[i].a;break}half-=segs[i].l}if(!pt)return;if(ang>90)ang-=180;if(ang<-90)ang+=180;if(Math.abs(ang)<25)ang=0;var lines=[nm];if(nm.length>20){var mid=Math.floor(nm.length/2),sp=nm.indexOf(' ',mid);if(sp<0)sp=nm.lastIndexOf(' ',mid);if(sp>3&&sp<nm.length-3)lines=[nm.slice(0,sp),nm.slice(sp+1)]}var tg=document.createElementNS(NS,'g');tg.setAttribute('transform','translate('+pt.x.toFixed(1)+','+pt.y.toFixed(1)+') rotate('+ang.toFixed(1)+')');var tx=document.createElementNS(NS,'text');tx.setAttribute('text-anchor','middle');tx.setAttribute('class','edge-name');if(lines.length===2){var t1=document.createElementNS(NS,'tspan');t1.setAttribute('x','0');t1.setAttribute('y','-2');t1.textContent=lines[0];tx.appendChild(t1);var t2=document.createElementNS(NS,'tspan');t2.setAttribute('x','0');t2.setAttribute('y','10');t2.textContent=lines[1];tx.appendChild(t2)}else{tx.setAttribute('y','4');tx.textContent=lines[0]}tg.appendChild(tx);g.appendChild(tg);n++;try{var bb=tx.getBBox();var r=document.createElementNS(NS,'rect');r.setAttribute('x',(bb.x-3).toFixed(1));r.setAttribute('y',(bb.y-2).toFixed(1));r.setAttribute('width',(bb.width+6).toFixed(1));r.setAttribute('height',(bb.height+4).toFixed(1));r.setAttribute('rx','3');r.setAttribute('class','edge-plate');tg.insertBefore(r,tx)}catch(e2){}});svg.appendChild(g);window.__edgeNames=n}catch(e){}}
 function colorize(){try{var reg=viewer.get('elementRegistry');var cv=viewer.get('canvas');reg.getAll().forEach(function(el){var bo=el.businessObject||{};var doc=((bo.documentation&&bo.documentation[0]&&bo.documentation[0].text)||'');if(el.type==='bpmn:UserTask')cv.addMarker(el.id,'t-manual');if(el.type==='bpmn:ServiceTask')cv.addMarker(el.id,doc.indexOf('EXTERNE')!==-1?'t-ext':'t-int');if(el.type==='label'&&el.labelTarget&&el.labelTarget.type==='bpmn:SequenceFlow')cv.addMarker(el.id,'lbl-hide');if(el.type==='label'&&el.labelTarget&&(el.labelTarget.type==='bpmn:StartEvent'||el.labelTarget.type==='bpmn:EndEvent'))cv.addMarker(el.id,'lbl-light')})}catch(e){}}
 function bindClick(){try{viewer.get('eventBus').on('element.click',function(e){var el=e.element;if(!el||!el.type||(el.type.indexOf('Task')===-1&&el.type!=='bpmn:SequenceFlow'))return;
 if(el.type==='bpmn:SequenceFlow'){var sn=(el.source&&el.source.businessObject&&el.source.businessObject.name)||el.source.businessObject.id;var tn=(el.target&&el.target.businessObject&&el.target.businessObject.name)||el.target.businessObject.id;document.getElementById('detail').innerHTML='<div><b>Transition</b></div><div style="color:#9a9a9a;font-size:11px;margin-top:4px">De : '+sn+'<br>Vers : '+tn+'</div><div style="margin-top:6px;color:#9a9a9a;font-size:11px">FR/EN : voir les \u00e9tapes source et cible (cliquez une boîte).</div>';return}var isAuto=el.type==='bpmn:ServiceTask';var doc='';try{var bo=el.businessObject;doc=(bo.documentation&&bo.documentation[0]&&bo.documentation[0].text)||''}catch(x){}
@@ -371,7 +374,7 @@ fetch('/inspector/api/model?t='+Date.now()).then(function(r){ if(!r.ok){throw ne
   try{
     viewer=new BpmnJS({container:'#canvas'});
     viewer.importXML(x).then(function(){
-      try{viewer.get('canvas').zoom('fit-viewport')}catch(e){}colorize();bindClick();
+      try{viewer.get('canvas').zoom('fit-viewport')}catch(e){}colorize();bindClick();edgeLabels();
 document.addEventListener('keydown',function(ev){if(ev.key==='+'||ev.key==='=')zzoom(1.25);if(ev.key==='-')zzoom(0.8);if(ev.key==='0')zfit()});
       var n=(x.match(/BPMNShape/g)||[]).length;
       if(!n)showErr('modele sans section BPMNDiagram (DI) - regenerer le modele converti');
