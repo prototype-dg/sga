@@ -341,7 +341,299 @@ svg defs marker path{fill:#b9bec9 !important;stroke:#b9bec9 !important}
 </style></head><body>
 <h1><span class="dot"></span>SGA Process Inspector — Octroi de Crédit</h1>
 <div class="sub"><span style="color:#6f6f78;font-size:10px;border:1px solid #2a2a33;border-radius:4px;padding:1px 6px">build 2026-10-09.5</span> Ce qui se passe DERRIÈRE chaque action : moteur Flowable en direct — étape courante du processus, historique d'exécution, variables du dossier, journal d'appels de la couche d'intégration.</div>
-<div class="grid"><div class="card"><span class="eyebrow">Step 1 — The story starts</span><h2>APPLI SGA — mobile simulator</h2><p>Submit a credit application the way a bank customer would, from a phone. The dossier is created in Plane in real time — zero human input on the tool side.</p><a class="btn" href="/mobile target="_blank" rel="noopener">Open the app simulator</a></div><div class="card"><span class="eyebrow">Before migration — the legacy state</span><h2>Jira DC — l'existant à répliquer</h2><p>Réplica Jira Data Center du workflow Octroi de Crédit : 34 étapes, transitions [APPLI], script SIL — et le jeu de démonstration de 100 dossiers (90 % traités, 10 % en cours). C'est cette instance qui sera migrée vers Plane pendant la démo.</p><a class="btn" href="${CFG.jiraUrl}" target="_blank" rel="noopener">Open Jira</a></div><div class="card"><span class="eyebrow">Step 2 — Follow the journey</span><h2>Plane — work tracking</h2><p>The OCR board carries the dossier through the real workflow states; the RFC project shows the same engine carrying IT change requests.</p><a class="btn" href="${CFG.planePublicUrl} target="_blank" rel="noopener">Open Plane</a><span class="meta">Sign-in: d.gibert@andersenlab.com / DemoAdmin123! (change after first login)</span></div><div class="card"><span class="eyebrow">Operator</span><h2>Terminal web</h2><p>Les commandes opérateur du runbook — import Jira → Plane, état des conteneurs, comptages — exécutables depuis le navigateur, en liste blanche sécurisée.</p><a class="btn" href="/terminal target="_blank" rel="noopener">Ouvrir le terminal</a></div><div class="card"><span class="eyebrow">Sous le capot</span><h2>Process Inspector</h2><p>La visualisation Flowable en direct : l'étape courante du processus en rouge sur le modèle BPMN, l'historique d'exécution, les variables du dossier et le journal des appels — ce qui se passe derrière chaque action.</p><a class="btn" href="/inspector target="_blank" rel="noopener">Ouvrir l'inspecteur</a></div></div>
+<div class="grid"><div class="panel"><h2>Processus (BPMN)</h2><div style="position:relative"><div class="zbar"><button title="Zoom + (touche +)" onclick="zzoom(1.25)">+</button><button title="Zoom − (touche -)" onclick="zzoom(0.8)">−</button><button title="Ajuster (touche 0)" style="width:auto;padding:0 10px;font-size:11px" onclick="zfit()">fit</button></div><div id="canvas"></div></div><div class="legend"><span><i class="m"></i>Manuelle (agent)</span><span><i class="a"></i>Auto — appel externe (EN: external call)</span><span><i class="i"></i>Auto — interne (EN: internal)</span><span>Cliquez une étape pour le détail</span></div></div>
+<div><div class="panel"><h2>Dossiers en cours (Flowable)</h2><select id="inst"><option value="">— chargement…</option></select><button class="btn" onclick="load()">Inspecter</button></div>
+<div class="panel" style="margin-top:12px"><h2>Étapes du parcours</h2><div class="tl" id="tl"><span class="empty">Choisissez un dossier puis « Inspecter ».</span></div></div>
+<div class="panel" style="margin-top:12px"><h2>Variables du dossier</h2><div class="vars" id="vars"><span class="empty">—</span></div></div><div class="panel" style="margin-top:12px"><h2>Détail de l'étape</h2><div class="vars" id="detail"><span class="empty">Cliquez sur une étape du diagramme.</span></div></div></div></div>
+<div class="panel" style="margin-top:12px"><h2>Journal de la couche d'intégration (temps réel)</h2><div class="log" id="log">…</div></div>
+<script>
+var viewer=null;
+function showErr(m){var c=document.getElementById('canvas');if(c)c.innerHTML='<div style="color:#ff6b6b;font:12px monospace;padding:14px">BPMN : '+String(m).replace(/</g,'&lt;')+'</div>'}
+var modelLoaded=false;
+function zzoom(f){try{var cv=viewer.get('canvas');cv.zoom(cv.zoom()*f)}catch(e){}}
+function zfit(){try{viewer.get('canvas').zoom('fit-viewport')}catch(e){}}
+function edgeLabels(){try{var NS='http://www.w3.org/2000/svg';var cont=viewer.get('canvas').getContainer();var svg=cont.querySelector('svg');if(!svg)return;var layer=null;try{layer=viewer.get('canvas').getDefaultLayer()}catch(eL){}if(!layer)layer=svg.querySelector('g.viewport')||svg;var old=layer.querySelector('.edge-names');if(old)old.parentNode.removeChild(old);var g=document.createElementNS(NS,'g');g.setAttribute('class','edge-names');var reg=viewer.get('elementRegistry');var n=0;reg.getAll().forEach(function(el){if(el.type!=='bpmn:SequenceFlow')return;var nm=(el.businessObject&&el.businessObject.name)||'';if(!nm)return;var wps=el.waypoints;if(!wps||wps.length<2)return;var segs=[],L=0,i;for(i=1;i<wps.length;i++){var dx=wps[i].x-wps[i-1].x,dy=wps[i].y-wps[i-1].y;var l=Math.sqrt(dx*dx+dy*dy)||0.0001;segs.push({l:l,a:Math.atan2(dy,dx)*180/Math.PI,x1:wps[i-1].x,y1:wps[i-1].y,x2:wps[i].x,y2:wps[i].y});L+=l}var half=L/2,pt=null,ang=0;for(i=0;i<segs.length;i++){if(half<=segs[i].l){var t=half/segs[i].l;pt={x:segs[i].x1+(segs[i].x2-segs[i].x1)*t,y:segs[i].y1+(segs[i].y2-segs[i].y1)*t};ang=segs[i].a;break}half-=segs[i].l}if(!pt)return;if(ang>90)ang-=180;if(ang<-90)ang+=180;if(Math.abs(ang)<25)ang=0;var lines=[nm];if(nm.length>20){var mid=Math.floor(nm.length/2),sp=nm.indexOf(' ',mid);if(sp<0)sp=nm.lastIndexOf(' ',mid);if(sp>3&&sp<nm.length-3)lines=[nm.slice(0,sp),nm.slice(sp+1)]}var tg=document.createElementNS(NS,'g');tg.setAttribute('transform','translate('+pt.x.toFixed(1)+','+pt.y.toFixed(1)+') rotate('+ang.toFixed(1)+')');var tx=document.createElementNS(NS,'text');tx.setAttribute('text-anchor','middle');tx.setAttribute('class','edge-name');if(lines.length===2){var t1=document.createElementNS(NS,'tspan');t1.setAttribute('x','0');t1.setAttribute('y','-2');t1.textContent=lines[0];tx.appendChild(t1);var t2=document.createElementNS(NS,'tspan');t2.setAttribute('x','0');t2.setAttribute('y','10');t2.textContent=lines[1];tx.appendChild(t2)}else{tx.setAttribute('y','4');tx.textContent=lines[0]}tg.appendChild(tx);g.appendChild(tg);n++;try{var bb=tx.getBBox();var r=document.createElementNS(NS,'rect');r.setAttribute('x',(bb.x-3).toFixed(1));r.setAttribute('y',(bb.y-2).toFixed(1));r.setAttribute('width',(bb.width+6).toFixed(1));r.setAttribute('height',(bb.height+4).toFixed(1));r.setAttribute('rx','3');r.setAttribute('class','edge-plate');tg.insertBefore(r,tx)}catch(e2){}});layer.appendChild(g);window.__edgeNames=n}catch(e){}}
+function colorize(){try{var reg=viewer.get('elementRegistry');var cv=viewer.get('canvas');reg.getAll().forEach(function(el){var bo=el.businessObject||{};var doc=((bo.documentation&&bo.documentation[0]&&bo.documentation[0].text)||'');if(el.type==='bpmn:UserTask')cv.addMarker(el.id,'t-manual');if(el.type==='bpmn:ServiceTask')cv.addMarker(el.id,doc.indexOf('EXTERNE')!==-1?'t-ext':'t-int');if(el.type==='label'&&el.labelTarget&&el.labelTarget.type==='bpmn:SequenceFlow')cv.addMarker(el.id,'lbl-hide');if(el.type==='label'&&el.labelTarget&&(el.labelTarget.type==='bpmn:StartEvent'||el.labelTarget.type==='bpmn:EndEvent'))cv.addMarker(el.id,'lbl-light')})}catch(e){}}
+function bindClick(){try{viewer.get('eventBus').on('element.click',function(e){var el=e.element;if(!el||!el.type||(el.type.indexOf('Task')===-1&&el.type!=='bpmn:SequenceFlow'))return;
+if(el.type==='bpmn:SequenceFlow'){var sn=(el.source&&el.source.businessObject&&el.source.businessObject.name)||el.source.businessObject.id;var tn=(el.target&&el.target.businessObject&&el.target.businessObject.name)||el.target.businessObject.id;document.getElementById('detail').innerHTML='<div><b>Transition</b></div><div style="color:#9a9a9a;font-size:11px;margin-top:4px">De : '+sn+'<br>Vers : '+tn+'</div><div style="margin-top:6px;color:#9a9a9a;font-size:11px">FR/EN : voir les \u00e9tapes source et cible (cliquez une boîte).</div>';return}var isAuto=el.type==='bpmn:ServiceTask';var doc='';try{var bo=el.businessObject;doc=(bo.documentation&&bo.documentation[0]&&bo.documentation[0].text)||''}catch(x){}
+var isExt=isAuto&&doc.indexOf('EXTERNE')!==-1;var isInt=isAuto&&!isExt;var enName='';try{var mEN=doc.split(' EN: ')[1];if(mEN)enName=mEN.split(' - ')[0]}catch(x){}
+var v=window._curVars||{};var ref=null;var nm2=String(v.dossierName||'');var p2=nm2.split('OCP-')[1];if(!p2){nm2=String(v.dossierId||'');p2=nm2.split('OCP-')[1]}if(p2)ref='OCP-'+p2.slice(0,9);
+var url=ref?('http://74.162.153.131:8080/issues/?jql='+encodeURIComponent('summary ~ "'+ref+'"')):'http://74.162.153.131:8080/jira/software/c/projects/OCP';
+var h='<div><b>'+(el.businessObject.name||el.id)+'</b></div>';
+h+='<div style="margin:4px 0"><span style="color:'+(isExt?'#E9041E':isInt?'#E9741E':'#28c840')+';font-weight:600">'+(isExt?'AUTOMATIQUE — APPEL SYSTEME EXTERNE (WSO2/REST)':isInt?'AUTOMATIQUE — OPERATION SYSTEME INTERNE':'MANUELLE (agent)')+'</span>'+(enName?'<span style="color:#9a9a9a;font-weight:400"> — EN: '+enName+'</span>':'')+'</div>';
+h+='<div style="color:#9a9a9a;font-size:11px;line-height:1.6">'+doc+'</div>';
+if(isExt){h+='<div style="margin-top:6px;font:11px monospace;color:#febc2e">bridge appliBridge > middleware > WSO2/REST vers le SI partenaire | EN: external system call via appliBridge</div>'}else if(isInt){h+='<div style="margin-top:6px;font:11px monospace;color:#febc2e">bridge appliBridge > operation interne du SI SGA | EN: internal system operation</div>'}else{h+='<div style="margin-top:6px">Dossier courant : '+(ref||'-')+'<br><a href="'+url+'" target="_blank" style="color:#E9041E">Ouvrir le dossier dans Jira</a></div>'}
+document.getElementById('detail').innerHTML=h})}catch(e){}}
+var stEl2=document.createElement('span');stEl2.id='st-inst';stEl2.style.cssText='font-size:11px;margin-left:8px;color:#6f6f78';stEl2.textContent='…';document.querySelector('.sub').appendChild(stEl2);
+var stEl=document.createElement('span');stEl.id='st-model';stEl.style.cssText='color:#febc2e;font-size:11px;margin-left:8px';stEl.textContent='\u23f3 en attente de migration \u2014 v\u00e9rification toutes les 5 s';document.querySelector('.sub').appendChild(stEl);
+function loadModel(){
+fetch('/inspector/api/model?t='+Date.now()).then(function(r){ if(!r.ok){throw new Error('empty:'+r.status)} return r.text()}).then(function(x){
+  if(modelLoaded)return; modelLoaded=true;
+  stEl.textContent='\u2713 mod\u00e8le migr\u00e9 charg\u00e9';stEl.style.color='#28c840';
+  var c=document.getElementById('canvas');c.innerHTML='';c.removeAttribute('data-empty');
+  try{
+    viewer=new BpmnJS({container:'#canvas'});
+    viewer.importXML(x).then(function(){
+      try{viewer.get('canvas').zoom('fit-viewport')}catch(e){}colorize();bindClick();edgeLabels();
+document.addEventListener('keydown',function(ev){if(ev.key==='+'||ev.key==='=')zzoom(1.25);if(ev.key==='-')zzoom(0.8);if(ev.key==='0')zfit()});
+      var n=(x.match(/BPMNShape/g)||[]).length;
+      if(!n)showErr('modele sans section BPMNDiagram (DI) - regenerer le modele converti');
+    }).catch(function(e){showErr('importXML: '+(e&&e.message?e.message:e))});
+  }catch(e){showErr('init viewer: '+String(e))}
+}).catch(function(e){var m=String(e&&e.message||e);
+  if(m.indexOf('empty:')===0){var c=document.getElementById('canvas');
+    if(!c.getAttribute('data-empty')){c.setAttribute('data-empty','1');c.innerHTML='<div style="color:#6f6f78;font:13px Montserrat,sans-serif;padding:24px;text-align:center;padding-top:190px">Aucun workflow migr\u00e9.<br><span style="font-size:11px">Le mod\u00e8le BPMN appara\u00eetra ici automatiquement (~5 s) apr\u00e8s la migration : terminal op\u00e9rateur \u2192 jira-import / workflow-migrate.</span></div>'}
+    setTimeout(loadModel,5000);}
+  else {showErr('chargement du modele: '+m);setTimeout(loadModel,10000);}
+})}
+loadModel();
+function loadInstances(){fetch('/inspector/api/instances?t='+Date.now()).then(function(r){return r.json()}).then(function(d){var sel=document.getElementById('inst');var cur=sel.value;var opts=(d.data||[]);sel.innerHTML='';opts.forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=(p.processDefinitionName||p.processDefinitionKey)+' — '+p.id.slice(0,8);sel.appendChild(o)});if(cur&&opts.some(function(p){return p.id===cur}))sel.value=cur;if(!opts.length){sel.innerHTML='<option value="">aucun processus actif</option>'}
+var ct=document.getElementById('st-inst');if(ct){ct.textContent=opts.length?('\u2713 '+opts.length+' dossier(s) en cours'):'0 dossier en cours';ct.style.color=opts.length?'#28c840':'#6f6f78'}}).catch(function(e){})}
+loadInstances();setInterval(loadInstances,10000);
+function load(){var id=document.getElementById('inst').value;if(!id)return;window._curId=id;
+fetch('/inspector/api/instance/'+id+'?t='+Date.now()).then(function(r){return r.json()}).then(function(d){window._curVars={};Object.keys(d.variables||{}).forEach(function(k){var v=d.variables[k];window._curVars[k]=(v&&v.value!==undefined)?v.value:v});
+ var tl=document.getElementById('tl');tl.innerHTML='';
+ (d.activities||[]).forEach(function(a){var e=document.createElement('div');e.className='t '+(a.end? 'done':'act');e.textContent=(a.end?'✓ ':'▶ ')+(a.name||a.activityId||'?')+'  '+(a.start? a.start.slice(11,19):'');tl.appendChild(e);
+  try{viewer.get('canvas').addMarker(a.activityId,a.end?'bjs-done':'bjs-active')}catch(e){}});
+ var vs='';Object.keys(d.variables||{}).forEach(function(k){vs+='<div><b>'+k+'</b> : '+(d.variables[k]&&d.variables[k].value!==undefined?d.variables[k].value:d.variables[k])+'</div>'});
+ document.getElementById('vars').innerHTML=vs||'<span class="empty">—</span>';});}
+setInterval(function(){fetch('/inspector/api/log?t='+Date.now()).then(function(r){return r.text()}).then(function(t){document.getElementById('log').textContent=t.slice(-3000)})},3000);
+</script></body></html>`;
+}
+
+async function resetPlaneOnly() {
+  const out = { deletedWorkItems: 0, errors: [] };
+  const projects = [CFG.planeCreditProject, CFG.planeRfcProject].filter(Boolean);
+  for (const pid of projects) {
+    try {
+      let guard = 0;
+      while (guard++ < 60) {
+        const page = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${pid}/work-items/?per_page=100`);
+        const items = (page.results || page || []);
+        if (!Array.isArray(items) || items.length === 0) break;
+        for (const wi of items) {
+          try { await planeApi('DELETE', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${pid}/work-items/${wi.id}/`); out.deletedWorkItems++; }
+          catch (e) { out.errors.push(`workitem ${wi.id}: ${e.message.slice(0, 120)}`); }
+        }
+        await new Promise(r2 => setTimeout(r2, 300));
+      }
+    } catch (e) { out.errors.push(`project ${pid}: ${e.message.slice(0, 160)}`); }
+  }
+  return out;
+}
+async function planeSeedDemo() {
+  const recs = ((DEMO_DATASET && DEMO_DATASET.records) || []).slice(0, 10);
+  let n = 0;
+  if (!CFG.planeCreditProject) return n;
+  for (const rec of recs) {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        await planeCreateWorkItem(CFG.planeCreditProject, {
+          name: `Dossier ${rec.demandeur}`,
+          description_html: `<p>Dossier de crédit (seed démo) ${rec.ref} — ${rec.produit}, ${rec.montant} DZD, agence ${rec.agence}.</p>`,
+          work_item_type: 'dossier-credit',
+          properties: { ref: rec.ref, montant: rec.montant, agence: rec.agence },
+        });
+        n++;
+        break;
+      } catch (e) {
+        if (/429|throttl|rate/i.test(e.message) && attempt < 3) { await new Promise(r2 => setTimeout(r2, 30000)); continue; }
+        resetJob.errors.push('plane seed ' + rec.ref + ': ' + e.message.slice(0, 100));
+        break;
+      }
+    }
+    await new Promise(r2 => setTimeout(r2, 1200));
+  }
+  return n;
+}
+async function resetFlowableOnly() {
+  const out = { deletedProcesses: 0, errors: [] };
+  try {
+    const procs = await flowableApi('GET', '/service/runtime/process-instances?size=100');
+    for (const p of (procs.data || [])) {
+      try { await flowableApi('DELETE', `/service/runtime/process-instances/${p.id}?cascade=true`); out.deletedProcesses++; }
+      catch (e) { out.errors.push(`proc ${p.id}: ${e.message.slice(0, 120)}`); }
+    }
+  } catch (e) { out.errors.push(`processes list: ${e.message.slice(0, 160)}`); }
+  try {
+    const defs = await flowableApi('GET', '/service/repository/process-definitions?latest=false&size=200');
+    for (const d of (defs.data || [])) {
+      if (d.key === 'OCP_case' && (d.version || 0) > 1) {
+        try { await flowableApi('DELETE', `/service/repository/process-definitions/${d.id}?cascade=true`); out.deletedDefs = (out.deletedDefs || 0) + 1; }
+        catch (e) { out.errors.push(`def ${d.id}: ${e.message.slice(0, 120)}`); }
+      }
+    }
+  } catch (e) { out.errors.push(`defs list: ${e.message.slice(0, 160)}`); }
+  return out;
+}
+const resetJob = { running: false, startedAt: null, finishedAt: null, phase: 'idle', done: 0, total: 0, errors: [], result: null };
+function jobSnap() {
+  return { running: resetJob.running, phase: resetJob.phase, done: resetJob.done, total: resetJob.total, errors: resetJob.errors.slice(0, 5), result: resetJob.result, startedAt: resetJob.startedAt, finishedAt: resetJob.finishedAt };
+}
+async function runResetJob() {
+  resetJob.running = true; resetJob.startedAt = Date.now(); resetJob.finishedAt = null; resetJob.done = 0; resetJob.total = 0; resetJob.errors = []; resetJob.result = null; resetJob.phase = 'wiping Plane';
+  MIGRATED = false; SUPPRESS_WEBHOOK = true;
+  try {
+    let planePart = { deletedWorkItems: 0, dbWipe: false, errors: [] };
+    try {
+      const r = await agentRun('plane-wipe');
+      if (r && r.exit === 0) planePart.dbWipe = true; else planePart.errors.push('agent plane-wipe failed: ' + String(r && r.stderr).slice(0, 120));
+    } catch (e) { planePart.errors.push('agent unreachable: ' + e.message.slice(0, 100)); }
+    if (!planePart.dbWipe) planePart = await resetPlaneOnly();
+    resetJob.phase = 'wiping Flowable';
+    let flowPart = { deletedProcesses: 0, defsDeleted: 0, errors: [] };
+    try {
+      const r = await agentRun('flowable-clean');
+      if (r && r.exit === 0) { const m = String(r.stdout || '').match(/(\d+) instances deleted, (\d+) migrated defs/); flowPart.deletedProcesses = m ? +m[1] : 0; flowPart.defsDeleted = m ? +m[2] : 0; }
+      else flowPart.errors.push('agent flowable-clean failed: ' + String(r && r.stderr).slice(0, 120));
+    } catch (e) { flowPart.errors.push('agent unreachable: ' + e.message.slice(0, 100)); }
+    if (!flowPart.deletedProcesses && !flowPart.defsDeleted) flowPart = await resetFlowableOnly();
+    resetJob.phase = 'seeding Plane';
+    const planeSeeded = await planeSeedDemo();
+    resetJob.phase = 'wiping Jira';
+    const jdel = CFG.jiraPass ? await jiraWipeIssues() : 0;
+    resetJob.phase = 're-seeding Jira dataset';
+    const seeded = CFG.jiraPass ? await jiraSeedDataset(resetJob) : 0;
+    resetJob.result = { ...planePart, planeSeeded, deletedProcesses: flowPart.deletedProcesses, jiraDeleted: jdel, jiraSeeded: seeded };
+  } catch (e) { resetJob.errors.push('fatal: ' + e.message.slice(0, 200)); }
+  SUPPRESS_WEBHOOK = false;
+  resetJob.phase = resetJob.errors.length ? 'error' : 'done';
+  resetJob.running = false; resetJob.finishedAt = Date.now();
+  log('reset job finished', resetJob.phase);
+}
+
+/* ---------------- Jira -> Plane migration bridge ---------------- */
+function nkey(s) { return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
+const migJob = { running: false, startedAt: null, finishedAt: null, phase: 'idle', done: 0, total: 0, errors: [], result: null };
+function migSnap() {
+  return { running: migJob.running, phase: migJob.phase, done: migJob.done, total: migJob.total, errors: migJob.errors.slice(0, 5), result: migJob.result, startedAt: migJob.startedAt, finishedAt: migJob.finishedAt };
+}
+async function runMigrationJob() {
+  migJob.running = true; migJob.startedAt = Date.now(); migJob.finishedAt = null; migJob.done = 0; migJob.total = 0; migJob.errors = []; migJob.result = null; migJob.phase = 'reading Jira';
+  try {
+    const sr = await jiraApi('POST', '/rest/api/2/search', { jql: `project = ${CFG.jiraProject}`, maxResults: 100, fields: ['summary', 'status', 'description'] });
+    const issues = sr.issues || [];
+    migJob.total = issues.length;
+    let states = [];
+    try { const sp = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/states/`); states = sp.results || sp || []; } catch (e) { migJob.errors.push('states: ' + e.message.slice(0, 100)); }
+    const smap = {};
+    for (const st of states) if (st && st.name && st.id) smap[nkey(st.name)] = st.id;
+    migJob.phase = 'wiping Plane OCR';
+    try {
+      const prior = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/work-items/?per_page=100`);
+      for (const wi of (prior.results || prior || [])) { try { await planeApi('DELETE', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/work-items/${wi.id}/`); } catch (e) { } }
+    } catch (e) { migJob.errors.push('wipe: ' + e.message.slice(0, 100)); }
+    let ok = 0, mapped = 0;
+    for (const it of issues) {
+      const f = it.fields || {};
+      const stName = f.status && f.status.name;
+      const sid = smap[nkey(stName)];
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const desc = String(f.description || '').slice(0, 400).replace(/[<>]/g, ' ');
+          const wi = await planeCreateWorkItem(CFG.planeCreditProject, { name: f.summary || ('Dossier ' + it.key), description_html: `<p>${desc}</p><p><i>Migré depuis Jira ${it.key} — statut source : ${stName || '?'}</i></p>`, work_item_type: 'dossier-credit', properties: { jira_key: it.key, jira_status: stName || null } });
+          if (sid) { try { await planeSetState(wi.id, sid, CFG.planeCreditProject); mapped++; } catch (e) { } }
+          ok++; break;
+        } catch (e) {
+          if (/429|throttl|rate/i.test(e.message) && attempt < 2) { await new Promise(r => setTimeout(r, 30000)); continue; }
+          migJob.errors.push(it.key + ': ' + e.message.slice(0, 120)); break;
+        }
+      }
+      migJob.done++; migJob.phase = `migrating ${migJob.done}/${migJob.total}`;
+      await new Promise(r => setTimeout(r, 400));
+    }
+    migJob.result = { migrated: ok, stateMapped: mapped, jiraTotal: issues.length, statesAvailable: states.map(x => x.name).slice(0, 15) };
+  } catch (e) { migJob.errors.push('fatal: ' + e.message.slice(0, 200)); }
+  migJob.phase = migJob.errors.length ? 'error' : 'done';
+  migJob.running = false; migJob.finishedAt = Date.now();
+  log('migration job finished', migJob.phase);
+}
+
+/* ---------------- Live status ---------------- */
+async function liveStatus() {
+  const st = { middleware: 'ok', plane: 'down', flowable: 'down', jira: 'skipped', workItems: null, jiraIssues: null };
+  try {
+    const page = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/work-items/?per_page=1`);
+    st.plane = 'ok'; st.workItems = page.total_results != null ? page.total_results : ((page.results || []).length);
+  } catch (e) { st.plane = 'down: ' + e.message.slice(0, 80); }
+  try { await flowableApi('GET', '/service/management/engine'); st.flowable = 'ok'; } catch (e) { st.flowable = 'down: ' + e.message.slice(0, 80); }
+  if (CFG.jiraPass) {
+    try { const sr = await jiraApi('POST', '/rest/api/2/search', { jql: `project = ${CFG.jiraProject}`, maxResults: 0 }); st.jira = 'ok'; st.jiraIssues = sr.total; } catch (e) { st.jira = 'down: ' + e.message.slice(0, 80); }
+  }
+  return st;
+}
+
+/* ---------------- Static assets ---------------- */
+const ASSETS = path.join(__dirname, 'assets');
+const ASSET_MIME = { '.svg': 'image/svg+xml', '.png': 'image/png', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.bpmn': 'application/xml; charset=utf-8' };
+function serveAsset(res, name) {
+  const file = path.join(ASSETS, path.basename(name));
+  if (!fs.existsSync(file)) return json(res, 404, { error: 'asset not found' });
+  const b = fs.readFileSync(file);
+  const ext = name.slice(name.lastIndexOf('.'));
+  res.writeHead(200, { 'content-type': ASSET_MIME[ext] || 'application/octet-stream', 'cache-control': 'public, max-age=3600', 'content-length': b.length });
+  res.end(b);
+}
+
+/* ---------------- Landing page ---------------- */
+const LOGO_DARK = '/assets/logo-dark.png';
+const LOGO_LIGHT = '/assets/logo-light.png';
+function landingPage(st) {
+  const badge = (label, v) => {
+    const ok = v === 'ok';
+    return `<div class="badge ${ok ? 'ok' : 'bad'}"><span class="dot"></span>${label}: ${String(v).slice(0, 40)}</div>`;
+  };
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SGA Demo Stand — Credit Origination on Flowable + Plane</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--red:#E9041E;--red-deep:#C6361B;--black:#000;--ink:#1c1c1c;--canvas:#F9F9F9;--grey:#F3F4F5;--body:#5A5A5A;--rose:#D9939B;--line:#e6e4e1}
+*{box-sizing:border-box;margin:0}
+body{font-family:'Source Sans 3',Arial,sans-serif;background:var(--canvas);color:var(--ink);line-height:1.5}
+.top{background:#fff;border-bottom:1px solid var(--line)}
+.top .in{max-width:1060px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:16px}
+.top img{height:34px}
+.top .tag{font-family:Montserrat,Arial,sans-serif;font-size:.72rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--body)}
+.hero{background:var(--black);color:#fff;padding:44px 24px}
+.hero .in{max-width:1060px;margin:0 auto}
+.hero .rule{width:64px;height:4px;background:var(--red);margin-bottom:18px}
+.hero h1{font-family:Montserrat,Arial,sans-serif;font-size:2rem;font-weight:800;line-height:1.2;max-width:640px}
+.hero p{color:#d9d6d1;max-width:640px;margin-top:10px;font-size:1.02rem}
+.wrap{max-width:1060px;margin:0 auto;padding:28px 24px 60px}
+.status{display:flex;flex-wrap:wrap;gap:10px;margin:-26px 0 26px}
+.badge{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-family:Montserrat,Arial,sans-serif;font-size:.78rem;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.badge .dot{width:9px;height:9px;border-radius:50%;background:#1db954}
+.badge.bad .dot{background:var(--red)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:10px}
+.card .eyebrow{font-family:Montserrat,Arial,sans-serif;font-size:.68rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--red)}
+.card h2{font-family:Montserrat,Arial,sans-serif;font-size:1.15rem;font-weight:700}
+.card p{color:var(--body);font-size:.92rem}
+.card a.btn,.card button.btn{margin-top:auto;align-self:flex-start;display:inline-block;background:var(--red);color:#fff;text-decoration:none;border:none;border-radius:8px;padding:10px 18px;font-family:Montserrat,Arial,sans-serif;font-weight:700;font-size:.9rem;cursor:pointer}
+.card a.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.card .meta{font-size:.8rem;color:var(--body)}
+.danger{border:1px solid #f3c6ca;background:#fff7f7}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:50}
+.modal.on{display:flex}
+.modal .box{background:#fff;border-radius:12px;max-width:430px;width:92%;padding:24px}
+.modal h3{font-family:Montserrat,Arial,sans-serif;margin-bottom:8px}
+.modal p{color:var(--body);font-size:.9rem}
+.modal .row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+#resetOut{display:none;margin-top:10px;background:var(--grey);border-radius:8px;padding:10px 12px;font-family:'Courier New',monospace;font-size:.78rem;white-space:pre-wrap}
+footer{border-top:1px solid var(--line);background:#fff;padding:18px 24px;text-align:center;color:var(--body);font-size:.8rem}
+.more{margin-top:20px}
+.more summary{cursor:pointer;font-family:Montserrat,Arial,sans-serif;font-weight:700;font-size:.92rem;color:var(--body);background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 18px;list-style:none;user-select:none}
+.more summary::-webkit-details-marker{display:none}
+.more summary::before{content:"▸\00a0"}
+.more[open] summary::before{content:"▾\00a0"}
+.more[open] summary{margin-bottom:14px}
+</style></head><body>
+<div class="top"><div class="in"><img src="${LOGO_DARK}" alt="Société Générale Algérie"><span class="tag">Demo Stand · Environment de démonstration</span></div></div>
+<div class="hero"><div class="in"><div class="rule"></div><h1>Octroi de Crédit &amp; RFC on Flowable + Plane</h1>
+<p>A working replica of the SGA credit-origination journey — mobile submission, insurance round-trip, DMN scoring, credit committee, execution — running live. All data is fictional.</p></div></div>
+<div class="wrap">
+<div class="status" id="status">${badge('Middleware', st.middleware)}${badge('Plane', st.plane === 'ok' ? 'ok' : st.plane<div class="grid"><div class="card"><span class="eyebrow">Step 1 — The story starts</span><h2>APPLI SGA — mobile simulator</h2><p>Submit a credit application the way a bank customer would, from a phone. The dossier is created in Plane in real time — zero human input on the tool side.</p><a class="btn" href="/mobile target="_blank" rel="noopener">Open the app simulator</a></div><div class="card"><span class="eyebrow">Before migration — the legacy state</span><h2>Jira DC — l'existant à répliquer</h2><p>Réplica Jira Data Center du workflow Octroi de Crédit : 34 étapes, transitions [APPLI], script SIL — et le jeu de démonstration de 100 dossiers (90 % traités, 10 % en cours). C'est cette instance qui sera migrée vers Plane pendant la démo.</p><a class="btn" href="${CFG.jiraUrl}" target="_blank" rel="noopener">Open Jira</a></div><div class="card"><span class="eyebrow">Step 2 — Follow the journey</span><h2>Plane — work tracking</h2><p>The OCR board carries the dossier through the real workflow states; the RFC project shows the same engine carrying IT change requests.</p><a class="btn" href="${CFG.planePublicUrl} target="_blank" rel="noopener">Open Plane</a><span class="meta">Sign-in: d.gibert@andersenlab.com / DemoAdmin123! (change after first login)</span></div><div class="card"><span class="eyebrow">Operator</span><h2>Terminal web</h2><p>Les commandes opérateur du runbook — import Jira → Plane, état des conteneurs, comptages — exécutables depuis le navigateur, en liste blanche sécurisée.</p><a class="btn" href="/terminal target="_blank" rel="noopener">Ouvrir le terminal</a></div><div class="card"><span class="eyebrow">Sous le capot</span><h2>Process Inspector</h2><p>La visualisation Flowable en direct : l'étape courante du processus en rouge sur le modèle BPMN, l'historique d'exécution, les variables du dossier et le journal des appels — ce qui se passe derrière chaque action.</p><a class="btn" href="/inspector target="_blank" rel="noopener">Ouvrir l'inspecteur</a></div></div>
 <details class="more"><summary>More components — integration layer &amp; mocks, process models, architecture dossier, demo reset</summary>
 <div class="grid"><div class="card"><span class="eyebrow">Under the hood</span><h2>Integration layer &amp; mocks</h2><p>This site is the middleware itself: ingestion API, signed webhooks, Flowable client, and mocked externals — AXA, Active Directory, customer DB, SMS, doc generator.</p><a class="btn ghost" href="/healthz target="_blank" rel="noopener">healthz</a>&nbsp;<a class="btn ghost" href="/mock/db/client/CLT-10042 target="_blank" rel="noopener">mock DB example</a></div><div class="card"><span class="eyebrow">Standards, not scripts</span><h2>Process models (GitHub)</h2><p>The CMMN case, DMN scoring table and RFC BPMN process that execute the demo — readable by business, versioned by Git.</p><a class="btn ghost" href="https://github.com/prototype-dg/sga/blob/main/models/ocp/OCP_case.cmmn target="_blank" rel="noopener">OCP_case.cmmn</a>&nbsp;<a class="btn ghost" href="https://github.com/prototype-dg/sga/blob/main/models/ocp/scoring.dmn target="_blank" rel="noopener">scoring.dmn</a>&nbsp;<a class="btn ghost" href="https://github.com/prototype-dg/sga/blob/main/models/rfc/RFC_process.bpmn target="_blank" rel="noopener">RFC_process.bpmn</a></div><div class="card"><span class="eyebrow">Reference</span><h2>Architecture dossier (PDF)</h2><p>The 19-page walkthrough delivered ahead of this demo: architecture, scenario mapping, migration economics.</p><a class="btn ghost" href="https://www.genspark.ai/api/files/s/DxrWQRCd target="_blank" rel="noopener">Open the dossier</a></div><div class="card danger"><span class="eyebrow">Operator only</span><h2>Reset demo data</h2><p>Wipes Plane work items, Flowable processes and every Jira issue in the OCP project — then re-seeds the full 100-dossier demo dataset (90% completed / 10% in progress) in Jira and the Plane seed dossiers. Runs as a background job — allow 5–10 min. Projects, states, models and mocks are kept.</p><button class="btn" onclick="askReset()">Reset demo data</button><div id="resetOut"></div></div></div>
 </details>
