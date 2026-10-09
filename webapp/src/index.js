@@ -330,13 +330,16 @@ select{background:#0c0c10;color:#e8e6e1;border:1px solid #2a2a33;border-radius:6
 .t-int .djs-label,.t-int text.djs-label{fill:#B35809 !important;font-size:11.5px !important;font-weight:700 !important}
 .t-manual .djs-label,.t-manual text.djs-label{fill:#111 !important;paint-order:stroke !important;stroke:#ffffff !important;stroke-width:2.5px !important}
 .lbl-hide{display:none !important}
+.zbar{position:absolute;top:10px;right:12px;display:flex;gap:6px;z-index:10}
+.zbar button{background:#1b1b22;border:1px solid #3a3a44;color:#e8e6e1;width:30px;height:30px;border-radius:6px;font-size:15px;cursor:pointer;font-family:monospace}
+.zbar button:hover{border-color:#E9041E;color:#fff}
 .legend{display:flex;gap:14px;align-items:center;color:#9a9a9a;font-size:11px;margin-top:6px}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px}
 .legend i.m{background:#fff}.legend i.a{background:#E9041E}.legend i.i{background:#E9741E}
 </style></head><body>
 <h1><span class="dot"></span>SGA Process Inspector — Octroi de Crédit</h1>
-<div class="sub">Ce qui se passe DERRIÈRE chaque action : moteur Flowable en direct — étape courante du processus, historique d'exécution, variables du dossier, journal d'appels de la couche d'intégration.</div>
-<div class="grid"><div class="panel"><h2>Processus (BPMN)</h2><div id="canvas"></div><div class="legend"><span><i class="m"></i>Manuelle (agent)</span><span><i class="a"></i>Auto — appel externe (EN: external call)</span><span><i class="i"></i>Auto — interne (EN: internal)</span><span>Cliquez une étape pour le détail</span></div></div>
+<div class="sub"><span style="color:#6f6f78;font-size:10px;border:1px solid #2a2a33;border-radius:4px;padding:1px 6px">build 2026-10-09.3</span> Ce qui se passe DERRIÈRE chaque action : moteur Flowable en direct — étape courante du processus, historique d'exécution, variables du dossier, journal d'appels de la couche d'intégration.</div>
+<div class="grid"><div class="panel"><h2>Processus (BPMN)</h2><div style="position:relative"><div class="zbar"><button title="Zoom + (touche +)" onclick="zzoom(1.25)">+</button><button title="Zoom − (touche -)" onclick="zzoom(0.8)">−</button><button title="Ajuster (touche 0)" style="width:auto;padding:0 10px;font-size:11px" onclick="zfit()">fit</button></div><div id="canvas"></div></div><div class="legend"><span><i class="m"></i>Manuelle (agent)</span><span><i class="a"></i>Auto — appel externe (EN: external call)</span><span><i class="i"></i>Auto — interne (EN: internal)</span><span>Cliquez une étape pour le détail</span></div></div>
 <div><div class="panel"><h2>Dossiers en cours (Flowable)</h2><select id="inst"><option value="">— chargement…</option></select><button class="btn" onclick="load()">Inspecter</button></div>
 <div class="panel" style="margin-top:12px"><h2>Étapes du parcours</h2><div class="tl" id="tl"><span class="empty">Choisissez un dossier puis « Inspecter ».</span></div></div>
 <div class="panel" style="margin-top:12px"><h2>Variables du dossier</h2><div class="vars" id="vars"><span class="empty">—</span></div></div><div class="panel" style="margin-top:12px"><h2>Détail de l'étape</h2><div class="vars" id="detail"><span class="empty">Cliquez sur une étape du diagramme.</span></div></div></div></div>
@@ -345,9 +348,11 @@ select{background:#0c0c10;color:#e8e6e1;border:1px solid #2a2a33;border-radius:6
 var viewer=null;
 function showErr(m){var c=document.getElementById('canvas');if(c)c.innerHTML='<div style="color:#ff6b6b;font:12px monospace;padding:14px">BPMN : '+String(m).replace(/</g,'&lt;')+'</div>'}
 var modelLoaded=false;
+function zzoom(f){try{var cv=viewer.get('canvas');cv.zoom(cv.zoom()*f)}catch(e){}}
+function zfit(){try{viewer.get('canvas').zoom('fit-viewport')}catch(e){}}
 function colorize(){try{var reg=viewer.get('elementRegistry');var cv=viewer.get('canvas');reg.getAll().forEach(function(el){var bo=el.businessObject||{};var doc=((bo.documentation&&bo.documentation[0]&&bo.documentation[0].text)||'');if(el.type==='bpmn:UserTask')cv.addMarker(el.id,'t-manual');if(el.type==='bpmn:ServiceTask')cv.addMarker(el.id,doc.indexOf('EXTERNE')!==-1?'t-ext':'t-int');if(el.type==='label'&&el.labelTarget&&el.labelTarget.type==='bpmn:SequenceFlow')cv.addMarker(el.id,'lbl-hide');if(el.type==='label'&&el.labelTarget&&(el.labelTarget.type==='bpmn:StartEvent'||el.labelTarget.type==='bpmn:EndEvent'))cv.addMarker(el.id,'lbl-light')})}catch(e){}}
 function bindClick(){try{viewer.get('eventBus').on('element.click',function(e){var el=e.element;if(!el||!el.type||(el.type.indexOf('Task')===-1&&el.type!=='bpmn:SequenceFlow'))return;
-if(el.type==='bpmn:SequenceFlow'){var sn=(el.source&&el.source.businessObject&&el.source.businessObject.name)||el.source.businessObject.id;var tn=(el.target&&el.target.businessObject&&el.target.businessObject.name)||el.target.businessObject.id;document.getElementById('detail').innerHTML='<div><b>Transition</b></div><div style=\'color:#9a9a9a;font-size:11px;margin-top:4px\'>De : '+sn+'<br>Vers : '+tn+'</div><div style=\'margin-top:6px;color:#9a9a9a;font-size:11px\'>FR/EN : voir les \u00e9tapes source et cible (cliquez une boîte).</div>';return}var isAuto=el.type==='bpmn:ServiceTask';var doc='';try{var bo=el.businessObject;doc=(bo.documentation&&bo.documentation[0]&&bo.documentation[0].text)||''}catch(x){}
+if(el.type==='bpmn:SequenceFlow'){var sn=(el.source&&el.source.businessObject&&el.source.businessObject.name)||el.source.businessObject.id;var tn=(el.target&&el.target.businessObject&&el.target.businessObject.name)||el.target.businessObject.id;document.getElementById('detail').innerHTML='<div><b>Transition</b></div><div style="color:#9a9a9a;font-size:11px;margin-top:4px">De : '+sn+'<br>Vers : '+tn+'</div><div style="margin-top:6px;color:#9a9a9a;font-size:11px">FR/EN : voir les \u00e9tapes source et cible (cliquez une boîte).</div>';return}var isAuto=el.type==='bpmn:ServiceTask';var doc='';try{var bo=el.businessObject;doc=(bo.documentation&&bo.documentation[0]&&bo.documentation[0].text)||''}catch(x){}
 var isExt=isAuto&&doc.indexOf('EXTERNE')!==-1;var isInt=isAuto&&!isExt;var enName='';try{var mEN=doc.split(' EN: ')[1];if(mEN)enName=mEN.split(' - ')[0]}catch(x){}
 var v=window._curVars||{};var ref=null;var nm2=String(v.dossierName||'');var p2=nm2.split('OCP-')[1];if(!p2){nm2=String(v.dossierId||'');p2=nm2.split('OCP-')[1]}if(p2)ref='OCP-'+p2.slice(0,9);
 var url=ref?('http://74.162.153.131:8080/issues/?jql='+encodeURIComponent('summary ~ "'+ref+'"')):'http://74.162.153.131:8080/jira/software/c/projects/OCP';
@@ -367,6 +372,7 @@ fetch('/inspector/api/model?t='+Date.now()).then(function(r){ if(!r.ok){throw ne
     viewer=new BpmnJS({container:'#canvas'});
     viewer.importXML(x).then(function(){
       try{viewer.get('canvas').zoom('fit-viewport')}catch(e){}colorize();bindClick();
+document.addEventListener('keydown',function(ev){if(ev.key==='+'||ev.key==='=')zzoom(1.25);if(ev.key==='-')zzoom(0.8);if(ev.key==='0')zfit()});
       var n=(x.match(/BPMNShape/g)||[]).length;
       if(!n)showErr('modele sans section BPMNDiagram (DI) - regenerer le modele converti');
     }).catch(function(e){showErr('importXML: '+(e&&e.message?e.message:e))});
