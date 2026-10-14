@@ -76,6 +76,19 @@ function send(res, code, text, ct = 'text/plain') { const b = Buffer.from(text);
 function html(res, code, text) { try { res.setHeader('cache-control', 'no-store'); } catch (e) { } return send(res, code, text, 'text/html; charset=utf-8'); }
 
 /* ---------------- HTTP to Plane ---------------- */
+const API_JOURNAL = [];
+function jrec(e) {
+  try {
+    let d = e.d || null;
+    if (!d) {
+      const hay = String(e.url || '') + ' ' + (typeof e.req === 'string' ? e.req : JSON.stringify(e.req || ''));
+      const m = hay.match(/work-items\/([0-9a-f-]{36})/i) || hay.match(/"dossierId"\s*:\s*"([0-9a-f-]{36})"/i) || hay.match(/businessKey[":\s]+([0-9a-f-]{36})/i);
+      if (m) d = m[1];
+    }
+    API_JOURNAL.push(Object.assign({ ts: new Date().toISOString(), d: d }, e));
+    if (API_JOURNAL.length > 600) API_JOURNAL.splice(0, API_JOURNAL.length - 600);
+  } catch (_) {}
+}
 async function planeApi(method, path, body) {
   const u = new URL(CFG.planeUrl + path);
   const res = await fetch(u, {
@@ -87,6 +100,7 @@ async function planeApi(method, path, body) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
+  jrec({ kind: 'plane', method, url: CFG.planeUrl + path, req: body ? JSON.stringify(body).slice(0, 900) : null, status: res.status, res: text.slice(0, 700) });
   if (!res.ok) throw new Error(`PLANE ${method} ${path} -> ${res.status}: ${text.slice(0, 300)}`);
   try { return JSON.parse(text); } catch { return text; }
 }
@@ -122,6 +136,7 @@ async function flowableApi(method, path, body) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
+  jrec({ kind: 'flowable', method, url: u.toString(), req: body ? JSON.stringify(body).slice(0, 900) : null, status: res.status, res: text.slice(0, 700) });
   if (!res.ok) throw new Error(`FLOWABLE ${method} ${path} -> ${res.status}: ${text.slice(0, 300)}`);
   try { return JSON.parse(text); } catch { return text; }
 }
@@ -411,7 +426,7 @@ svg defs marker path{fill:#b9bec9 !important;stroke:#b9bec9 !important}
 .edge-plate{fill:#14141a;opacity:.92}
 </style></head><body>
 <h1><span class="dot"></span>SGA Process Inspector — Octroi de Crédit</h1>
-<div class="sub"><span style="color:#6f6f78;font-size:10px;border:1px solid #2a2a33;border-radius:4px;padding:1px 6px">build 2026-10-14.resilient.2</span> Ce qui se passe DERRIÈRE chaque action : moteur Flowable en direct — étape courante du processus, historique d'exécution, variables du dossier, journal d'appels de la couche d'intégration.</div>
+<div class="sub"><span style="color:#6f6f78;font-size:10px;border:1px solid #2a2a33;border-radius:4px;padding:1px 6px">build 2026-10-14.task-details.3</span> Ce qui se passe DERRIÈRE chaque action : moteur Flowable en direct — étape courante du processus, historique d'exécution, variables du dossier, journal d'appels de la couche d'intégration.</div>
 <div class="grid"><div class="panel"><h2>Processus (BPMN)</h2><div style="position:relative"><div class="zbar"><button title="Zoom + (touche +)" onclick="zzoom(1.25)">+</button><button title="Zoom − (touche -)" onclick="zzoom(0.8)">−</button><button title="Ajuster (touche 0)" style="width:auto;padding:0 10px;font-size:11px" onclick="zfit()">fit</button></div><div id="canvas"></div></div><div class="legend"><span><i class="m"></i>Manuelle (agent)</span><span><i class="a"></i>Automatisation simulée</span><span><i class="i"></i>Expression moteur</span><span>Cliquez une étape pour le détail</span><span style="color:#28c840">Parcours suivi en vert</span><span>Survolez une flèche pour voir son libellé</span></div></div>
 <div><div class="panel"><h2>Dossiers et historique (Flowable)</h2><select id="inst"><option value="">— chargement…</option></select><button class="btn" onclick="load()">Inspecter</button></div>
 <div class="panel" style="margin-top:12px"><h2>Étapes du parcours</h2><div class="tl" id="tl"><span class="empty">Choisissez un dossier puis « Inspecter ».</span></div></div>
@@ -430,21 +445,7 @@ if(!window.__hoverBound){window.__hoverBound=1;try{var eb=viewer.get('eventBus')
 }catch(e){}}
 function clearHover(){try{if(window.__hovOv&&viewer){viewer.get('overlays').remove(window.__hovOv);window.__hovOv=null}}catch(e){}}
 function colorize(){try{var reg=viewer.get('elementRegistry');var cv=viewer.get('canvas');reg.getAll().forEach(function(el){var bo=el.businessObject||{};var doc=((bo.documentation&&bo.documentation[0]&&bo.documentation[0].text)||'');if(el.type==='bpmn:UserTask')cv.addMarker(el.id,'t-manual');if(el.type==='bpmn:ServiceTask')cv.addMarker(el.id,doc.indexOf('EXTERNE')!==-1?'t-ext':'t-int');if(el.type==='label'&&el.labelTarget&&el.labelTarget.type==='bpmn:SequenceFlow')cv.addMarker(el.id,'lbl-hide');if(el.type==='label'&&el.labelTarget&&(el.labelTarget.type==='bpmn:StartEvent'||el.labelTarget.type==='bpmn:EndEvent'))cv.addMarker(el.id,'lbl-light')})}catch(e){}}
-function bindClick(){try{viewer.get('eventBus').on('element.click',function(e){var el=e.element;if(!el||!el.type||(el.type.indexOf('Task')===-1&&el.type!=='bpmn:SequenceFlow'))return;
-if(el.type==='bpmn:SequenceFlow'){var sn=(el.source&&el.source.businessObject&&el.source.businessObject.name)||el.source.businessObject.id;var tn=(el.target&&el.target.businessObject&&el.target.businessObject.name)||el.target.businessObject.id;document.getElementById('detail').innerHTML='<div><b>Transition</b></div><div style="color:#9a9a9a;font-size:11px;margin-top:4px">De : '+sn+'<br>Vers : '+tn+'</div><div style="margin-top:6px;color:#9a9a9a;font-size:11px">FR/EN : voir les \u00e9tapes source et cible (cliquez une boîte).</div>';return}var isAuto=el.type==='bpmn:ServiceTask';var doc='';try{var bo=el.businessObject;doc=(bo.documentation&&bo.documentation[0]&&bo.documentation[0].text)||''}catch(x){}
-var isExt=isAuto&&doc.indexOf('EXTERNE')!==-1;var isInt=isAuto&&!isExt;var enName='';try{var mEN=doc.split(' EN: ')[1];if(mEN)enName=mEN.split(' - ')[0]}catch(x){}
-var v=window._curVars||{};var ref=null;var nm2=String(v.dossierName||'');var p2=nm2.split('OCP-')[1];if(!p2){nm2=String(v.dossierId||'');p2=nm2.split('OCP-')[1]}if(p2)ref='OCP-'+p2.slice(0,9);
-var planeUrl='https://sga-plane.andersenlab.com/sga/projects/78437061-9397-42f4-9224-5e3f6b46a7c5/';
-var url=ref?('http://74.162.153.131:8080/issues/?jql='+encodeURIComponent('summary ~ "'+ref+'"')):'http://74.162.153.131:8080/jira/software/c/projects/OCP';
-
-var h='<div><b>'+safe(el.businessObject.name||el.id)+'</b></div>';
-h+='<div style="margin:4px 0"><span style="color:'+(isExt?'#E9041E':isInt?'#E9741E':'#28c840')+';font-weight:600">'+(isExt?'AUTOMATIQUE — SIMULATION (pas d’appel externe)':isInt?'AUTOMATIQUE — EXPRESSION MOTEUR (simulation)':'MANUELLE (agent)')+'</span>'+(enName?'<span style="color:#9a9a9a;font-weight:400"> — EN: '+enName+'</span>':'')+'</div>';
-h+='<div style="color:#9a9a9a;font-size:11px;line-height:1.6">'+safe(doc)+'</div>';
-h+='<div style="margin-top:6px">Dossier : '+safe(v.dossierId||requestedDossier||'—')+'</div>';
-if(isAuto)h+='<div>Simulation moteur : aucun appel externe démontré.</div>';
-h+=executionDetail(el.id);
-if(v.dossierId)h+='<div><a href="'+safe(planeUrl+'issues/'+encodeURIComponent(v.dossierId))+'" target="_blank" rel="noopener">Ouvrir ce dossier dans Plane</a></div>';
-document.getElementById('detail').innerHTML=h})}catch(e){}}
+function bindClick(){try{viewer.get('eventBus').on('element.click',function(e){var el=e.element;if(!el||!el.type||el.type.indexOf('Task')===-1)return;showTaskDetail(el.id,el.businessObject&&el.businessObject.name)})}catch(e){}}
 var stEl2=document.createElement('span');stEl2.id='st-inst';stEl2.style.cssText='font-size:11px;margin-left:8px;color:#6f6f78';stEl2.textContent='…';document.querySelector('.sub').appendChild(stEl2);
 var stEl=document.createElement('span');stEl.id='st-model';stEl.style.cssText='color:#febc2e;font-size:11px;margin-left:8px';stEl.textContent='\u23f3 en attente de migration \u2014 v\u00e9rification toutes les 5 s';document.querySelector('.sub').appendChild(stEl);
 function loadModel(){
@@ -472,9 +473,95 @@ var requestedInstance=new URLSearchParams(location.search).get('instance');
 var loadedDefinition=null, loadGeneration=0;
 function safe(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function checked(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
-function executionDetail(id){var rows=(window._activities||[]).filter(function(a){return a.activityId===id});if(!rows.length)return '<div>Non exécutée dans cette instance.</div>';return rows.map(function(a){return '<div style="margin-top:8px"><b>'+safe(a.deleteReason?'Terminée / supprimée':a.end?'Terminée':'En cours')+'</b><br>Début : '+safe(a.start)+'<br>Fin : '+safe(a.end||'—')+'<br>Durée (ms) : '+safe(a.durationInMillis==null?'—':a.durationInMillis)+'<br>Exécution : '+safe(a.executionId)+'<br>Tâche : '+safe(a.taskId||'—')+'<br>Agent : '+safe(a.assignee||'non enregistré')+'<br>Motif de suppression : '+safe(a.deleteReason||'—')+'<br>Preuve : '+safe(a.evidence)+'</div>'}).join('')}
+function fetchJournal(){if(!requestedDossier||window._journalFor===requestedDossier)return;fetch('/inspector/api/journal/'+encodeURIComponent(requestedDossier)).then(function(r){return r.ok?r.json():{entries:[]}}).then(function(d){window._journal=(d.entries||[]);window._journalFor=requestedDossier}).catch(function(){window._journal=[]})}
+var KB={
+"Création dossier (APPLI)":{t:"Auto",ess:"Credit case created from the mobile application; the Flowable engine instantiates the OCP workflow.",sys:"Core banking app + workflow engine"},
+"État initial observé":{t:"Gateway",ess:"Routing gateway: picks the entry point that matches the dossier's current Plane state (migration snapshot)."},
+"Demande Reçue":{t:"Manual",role:"Branch Officer (Agence)",do:"Register the credit request received at the branch: verify identity, capture the request, hand the client the document list.",ess:"Intake of the credit application."},
+"Demande initiée":{t:"Manual",role:"Branch Officer (Agence)",do:"Initiate the credit file in the core banking system and attach the client data.",ess:"File formally opened."},
+"Demande incomplète":{t:"Manual",role:"Branch Officer (Agence)",do:"List the missing documents and inform the client what is still needed.",ess:"File flagged incomplete."},
+"Attente complément":{t:"Manual",role:"Branch Officer (Agence)",do:"Chase the client for the outstanding documents.",ess:"Waiting for client documents."},
+"Dossier à compléter":{t:"Manual",role:"Branch Officer (Agence)",do:"Assemble the full file: payslips, bank statements, ID, collateral papers.",ess:"File assembly."},
+"En cours d'annulation":{t:"Manual",role:"Branch Officer (Agence)",do:"Process the client's cancellation request and confirm intent.",ess:"Cancellation in progress."},
+"Annulé":{t:"Manual",role:"Branch Manager",do:"Close the file as cancelled and notify the client.",ess:"File cancelled."},
+"Demande en étude":{t:"Manual",role:"Credit Analyst",do:"Analyse the request: scoring, debt ratio, income verification, draft an opinion.",ess:"Credit analysis."},
+"Etude en cours":{t:"Manual",role:"Credit Analyst",do:"Perform the risk study and prepare the recommendation for decision.",ess:"Risk study."},
+"Dossier à contrôler":{t:"Manual",role:"Risk & Control Officer",do:"Second-eyes control of the study and the assembled file.",ess:"Control gate."},
+"Contrôle en cours":{t:"Manual",role:"Risk & Control Officer",do:"Run compliance checks: KYC, debt service, collateral completeness.",ess:"Compliance checks."},
+"Contrôle validé":{t:"Manual",role:"Risk & Control Officer",do:"Sign off the control; the file is cleared for decision.",ess:"Control signed off."},
+"Dossier Constitué":{t:"Manual",role:"Guarantees Officer",do:"Confirm the complete file is ready for guarantees and decision.",ess:"File complete."},
+"Attente infos Supp Décisionnaire":{t:"Manual",role:"Decision Maker (Committee)",do:"Provide the additional information requested by the decision committee.",ess:"Info requested by decision-maker."},
+"Attente Info Supp DR":{t:"Manual",role:"Regional Direction (DR)",do:"Supply regional-direction-level additional information.",ess:"Info requested by DR."},
+"Attente Info Supp RUC":{t:"Manual",role:"Risk Committee (RUC)",do:"Supply the committee-requested clarifications.",ess:"Info requested by RUC."},
+"Attente infos supp BO":{t:"Manual",role:"Back Office",do:"Provide the back-office requested details.",ess:"Info requested by BO."},
+"Attente info sup POS/APPLI":{t:"Manual",role:"Branch / IT (POS)",do:"Provide point-of-sale or application-level information.",ess:"Info from POS/APPLI."},
+"Montage à refaire":{t:"Manual",role:"Credit Analyst",do:"Rebuild the file structure (incorrect structure or documents).",ess:"File rebuild."},
+"Dérogation demandée":{t:"Manual",role:"Decision Maker (Committee)",do:"Handle the exception request outside standard policy (derogation).",ess:"Derogation path."},
+"En attente de signature":{t:"Manual",role:"Branch Officer + Client",do:"Obtain the client's signature on the credit agreement.",ess:"Signature step."},
+"Garanties à recueillir":{t:"Manual",role:"Guarantees Officer",do:"Collect the guarantees: pledges, mortgages, deposits.",ess:"Guarantee collection."},
+"garantie pré-validée":{t:"Manual",role:"Guarantees Officer",do:"Pre-validate the received guarantees before the formal legal check.",ess:"Guarantee pre-validation."},
+"Attente info supp garantie":{t:"Manual",role:"Guarantees Officer",do:"Request the missing guarantee documents.",ess:"Guarantee info pending."},
+"Garantie validée":{t:"Manual",role:"Guarantees Officer",do:"Legally validate the guarantees.",ess:"Guarantees validated."},
+"Garanties reçues":{t:"Manual",role:"Guarantees Officer",do:"Confirm all guarantees are received and filed.",ess:"Guarantees received."},
+"Attente AXA":{t:"Manual",role:"Insurance Liaison (AXA)",do:"Obtain AXA insurance validation (death/disability cover) for the loan.",ess:"Insurance validation."},
+"Attente décision":{t:"Manual",role:"Decision Maker (Committee)",do:"Present the file to the decision committee and record the verdict.",ess:"Decision."},
+"Demande refusée":{t:"Manual",role:"Decision Maker (Committee)",do:"Notify the client of the refusal with documented reasons.",ess:"Refusal."},
+"Demande rejetée":{t:"Manual",role:"Branch Manager",do:"Reject the non-compliant file and inform the client.",ess:"Rejection."},
+"Dossier à décaisser":{t:"Manual",role:"Back-Office Disbursement",do:"Prepare the funds release: verify conditions precedent, set up the disbursement order.",ess:"Disbursement preparation."},
+"Dossier décaissé":{t:"Manual",role:"Back-Office Disbursement",do:"Funds released to the client account; confirm the transfer.",ess:"Disbursed."},
+"Dossier décaissé partiellement":{t:"Manual",role:"Back-Office Disbursement",do:"Partial release performed; track the remaining tranche.",ess:"Partial disbursement."},
+"Dossier soldé":{t:"Manual",role:"Archives",do:"File fully repaid and closed; archive the record.",ess:"Closed / archived."},
+"[APPLI] - Compléter la demande":{t:"Auto",sys:"Core banking app (simulated)",ess:"Auto-completes the intake data in the core application."},
+"[APPLI] - Soumettre pour décision":{t:"Auto",sys:"Decision interface (simulated)",ess:"Submits the study result to the decision step."},
+"[APPLI] - Constituer dossier - Demander garanties":{t:"Auto",sys:"Core banking app (simulated)",ess:"Creates the guarantees demand on the file."},
+"[APPLI] - Garanties à recueillir":{t:"Auto",sys:"Core banking app (simulated)",ess:"Registers the guarantee-collection milestone."},
+"[APPLI] - Garanties reçues":{t:"Auto",sys:"Core banking app (simulated)",ess:"Registers guarantee receipt in the application."},
+"[APPLI] - Décision":{t:"Auto",sys:"Decision interface (simulated)",ess:"Records a favorable decision outcome."},
+"[APPLI] - Défavorable":{t:"Auto",sys:"Decision interface (simulated)",ess:"Records an unfavorable decision outcome."},
+"[APPLI] - Demande refusée":{t:"Auto",sys:"Decision interface (simulated)",ess:"Records the refusal in the application."},
+"[APPLI] - Décaisser dossier":{t:"Auto",sys:"Disbursement module (simulated)",ess:"Triggers the disbursement order."},
+"[APPLI] - Archivage":{t:"Auto",sys:"Archive module (simulated)",ess:"Archives the completed file."},
+"[APPLI] - Auto Fournir infos supp APPLI/POS":{t:"Auto",sys:"POS/APPLI integration (simulated)",ess:"Fetches the missing information from POS/APPLI."},
+"[APPLI] - Attente décision":{t:"Auto",sys:"Decision interface (simulated)",ess:"Marks the waiting-for-decision milestone."},
+"[APPLI] - Test TNR APPLI":{t:"Auto",sys:"Application regression test",ess:"Application non-regression test step."}
+};
+function showTaskDetail(activityId, name, isCurrent) {
+  var rows = (window._activities || []).filter(function(a){return a.activityId === activityId});
+  var a = rows.length ? rows[rows.length - 1] : null;
+  var kb = (name && KB[name]) || {t: rows.length && rows[0].type === 'serviceTask' ? 'Auto' : 'Manual', ess: 'No description for this step.'};
+  var isAuto = kb.t === 'Auto';
+  var h = '<div style="font-size:13px;font-weight:600;color:#fff">' + safe(name || activityId) + '</div>';
+  h += '<div style="margin:3px 0 6px"><span style="color:' + (isAuto ? '#E9741E' : '#28c840') + ';font-weight:600;font-size:11px">' + (isAuto ? 'AUTOMATED STEP (simulated app integration)' : 'MANUAL STEP (agent)') + '</span>' + (isCurrent ? '<span style="color:#E9041E;font-weight:600;font-size:11px"> — CURRENT STEP</span>' : '') + '</div>';
+  h += '<div style="color:#c9c9c9;font-size:11.5px;line-height:1.55"><b>Business meaning:</b> ' + safe(kb.ess) + '</div>';
+  if (kb.role) h += '<div style="color:#c9c9c9;font-size:11.5px;line-height:1.55"><b>Assigned role:</b> ' + safe(kb.role) + '</div>';
+  if (kb.do) h += '<div style="color:#c9c9c9;font-size:11.5px;line-height:1.55"><b>What the person does:</b> ' + safe(kb.do) + '</div>';
+  if (kb.sys) h += '<div style="color:#c9c9c9;font-size:11.5px;line-height:1.55"><b>System:</b> ' + safe(kb.sys) + '</div>';
+  if (a) {
+    var dur = a.durationInMillis != null ? (a.durationInMillis > 1500 ? Math.round(a.durationInMillis / 100) / 10 + ' s' : a.durationInMillis + ' ms') : '—';
+    h += '<div style="margin-top:6px;color:#9a9a9a;font-size:11px;line-height:1.6"><b>Engine execution</b><br>' + (a.end ? 'Completed ' + safe(String(a.end).slice(0,19).replace('T',' ')) + ' · took ' + dur : 'Running since ' + safe(String(a.start).slice(0,19).replace('T',' '))) + '<br>' + (a.assignee ? 'Assignee: ' + safe(a.assignee) : 'Advanced by the middleware from the Plane card move (no human assignee — demo)') + '</div>';
+    var t0 = Date.parse(a.start) - 3000, t1 = a.end ? Date.parse(a.end) + 5000 : Date.now();
+    var trail = (window._journal || []).filter(function(x){var t = Date.parse(x.ts); return t >= t0 && t <= t1});
+    h += '<div style="margin-top:6px;color:#9a9a9a;font-size:11px;line-height:1.6"><b>Integration trail (' + trail.length + ' call' + (trail.length === 1 ? '' : 's') + ')</b>';
+    if (!trail.length) h += '<br>No integration calls in this step window.' + ((window._journal || []).length ? '' : ' (journal loads shortly after the page opens)');
+    trail.forEach(function(x, idx) {
+      var dir = x.kind === 'webhook' ? 'IN ' : 'OUT';
+      var col = x.kind === 'webhook' ? '#febc2e' : '#6ab0f3';
+      h += '<div style="margin-top:5px"><span style="color:' + col + ';font-weight:600">' + dir + ' ' + safe(x.method) + ' ' + safe(x.url) + '</span> <span style="color:#9a9a9a">' + safe(x.status) + '</span>';
+      if (x.req) h += '<details style="margin-top:2px"><summary style="cursor:pointer;color:#8a8a8a;font-size:10.5px">request payload</summary><pre style="white-space:pre-wrap;word-break:break-word;color:#b9bec9;font-size:10px;margin:2px 0">' + safe(x.req) + '</pre></details>';
+      if (x.res) h += '<details style="margin-top:2px"><summary style="cursor:pointer;color:#8a8a8a;font-size:10.5px">response</summary><pre style="white-space:pre-wrap;word-break:break-word;color:#b9bec9;font-size:10px;margin:2px 0">' + safe(x.res) + '</pre></details>';
+      h += '</div>';
+    });
+    h += '</div>';
+  } else {
+    h += '<div style="margin-top:6px;color:#9a9a9a;font-size:11px">Not executed in this instance.</div>';
+  }
+  var v = window._curVars || {};
+  if (v.stateId || v.lastPlaneTransition) h += '<div style="margin-top:5px;color:#9a9a9a;font-size:10.5px">Engine vars: ' + safe(JSON.stringify({stateId: v.stateId, lastPlaneTransition: v.lastPlaneTransition})) + '</div>';
+  document.getElementById('detail').innerHTML = h;
+}
+function executionDetail(id){var rows=(window._activities||[]).filter(function(a){return a.activityId===id});if(!rows.length)return '<div style="color:#9a9a9a;font-size:11px">Not executed in this instance.</div>';var a=rows[rows.length-1];return '<div style="color:#9a9a9a;font-size:11px">'+(a.end?'Completed':'Running')+' · '+safe(String(a.start||'').slice(0,19).replace('T',' '))+(a.end?' → '+safe(String(a.end).slice(0,19).replace('T',' ')):'')+'</div>'}
 function paint(){if(!viewer)return;try{var cv=viewer.get('canvas');var reg=viewer.get('elementRegistry');reg.getAll().forEach(function(el){cv.removeMarker(el.id,'bjs-done');cv.removeMarker(el.id,'bjs-active');cv.removeMarker(el.id,'bjs-flow-done');cv.removeMarker(el.id,'dim')});var by={};(window._activities||[]).forEach(function(a){by[a.activityId]=by[a.activityId]||{done:false,active:false};if(a.end&&!a.deleteReason)by[a.activityId].done=true;else if(!a.end)by[a.activityId].active=true});Object.keys(by).forEach(function(id){if(by[id].active||by[id].done)cv.addMarker(id,by[id].active?'bjs-active':'bjs-done')});(window._flows||[]).forEach(function(f){if(f&&f.id){try{cv.addMarker(f.id,'bjs-flow-done')}catch(eF){}}});var follow=requestedDossier&&((window._activities||[]).length||(window._flows||[]).length);if(follow){reg.getAll().forEach(function(el){var keep=by[el.id]||(window._flowSet&&window._flowSet[el.id])||(el.type==='label'&&el.labelTarget&&(by[el.labelTarget.id]||(window._flowSet&&window._flowSet[el.labelTarget.id])));if(!keep)cv.addMarker(el.id,'dim')})}edgeLabels()}catch(e){}}
-function renderData(d){window._curVars=d.variables||{};window._activities=d.activities||[];window._flows=d.flows||[];window._flowSet={};(d.flows||[]).forEach(function(f){window._flowSet[f.id]=1});window._flowSetEmpty=!(d.flows||[]).length;var tl=document.getElementById('tl');tl.innerHTML='';var summary=document.createElement('div');summary.textContent='Instance '+d.id+' — '+(d.completed?'terminée':'en cours');tl.appendChild(summary);(d.activities||[]).forEach(function(a){var e=document.createElement('div');e.className='t '+(a.end?'done':'act');e.textContent=(a.deleteReason?'Supprimée : ':a.end?'Terminée : ':'En cours : ')+(a.name||a.activityId)+' — '+(a.end||a.start||'');e.onclick=function(){document.getElementById('detail').innerHTML=executionDetail(a.activityId)};tl.appendChild(e)});document.getElementById('vars').innerHTML=Object.keys(d.variables||{}).map(function(k){return '<div><b>'+safe(k)+'</b> : '+safe(typeof d.variables[k]==='object'?JSON.stringify(d.variables[k]):d.variables[k])+'</div>'}).join('')||'Aucune variable enregistrée';paint();var current=(d.tasks||[])[0];if(current)document.getElementById('detail').innerHTML='<b>Étape courante : '+safe(current.name||current.taskDefinitionKey)+'</b>'+executionDetail(current.taskDefinitionKey);else if(d.completed)document.getElementById('detail').textContent=d.deleteReason?'Instance terminée par suppression : '+d.deleteReason:'Instance terminée';}
+function renderData(d){window._curVars=d.variables||{};window._activities=d.activities||[];window._flows=d.flows||[];window._flowSet={};(d.flows||[]).forEach(function(f){window._flowSet[f.id]=1});window._flowSetEmpty=!(d.flows||[]).length;var tl=document.getElementById('tl');tl.innerHTML='';var summary=document.createElement('div');summary.textContent='Instance '+d.id+' — '+(d.completed?'terminée':'en cours');tl.appendChild(summary);(d.activities||[]).forEach(function(a){var e=document.createElement('div');e.className='t '+(a.end?'done':'act');e.textContent=(a.deleteReason?'Supprimée : ':a.end?'Terminée : ':'En cours : ')+(a.name||a.activityId)+' — '+(a.end||a.start||'');e.onclick=function(){showTaskDetail(a.activityId,a.name)};tl.appendChild(e)});document.getElementById('vars').innerHTML=Object.keys(d.variables||{}).map(function(k){return '<div><b>'+safe(k)+'</b> : '+safe(typeof d.variables[k]==='object'?JSON.stringify(d.variables[k]):d.variables[k])+'</div>'}).join('')||'Aucune variable enregistrée';fetchJournal();paint();var current=(d.tasks||[])[0];if(current)showTaskDetail(current.taskDefinitionKey,current.name,true);else if(d.completed)document.getElementById('detail').textContent=d.deleteReason?'Instance terminée par suppression : '+d.deleteReason:'Instance terminée';}
 async function loadInstances(){try{var d;if(requestedDossier){d=bootstrap&&bootstrap.dossier?bootstrap.dossier:await fetch('/inspector/api/dossier/'+encodeURIComponent(requestedDossier)).then(checked);if(bootstrap)bootstrap.dossier=null;window._dossier=d;document.getElementById('st-inst').textContent=d.name+' — état Plane : '+d.state;d={data:d.instances};if(!d.data.length){window._activities=[];window._flows=[];window._curVars={dossierId:requestedDossier};paint();document.getElementById('tl').textContent=window._dossier.reason;document.getElementById('detail').textContent='État courant Plane : '+window._dossier.state+' (pas une preuve d’exécution Flowable)'}}else{d=await fetch('/inspector/api/instances').then(checked)}var sel=document.getElementById('inst'),cur=sel.value;sel.innerHTML='';(d.data||[]).forEach(function(p){var v={};(p.variables||[]).forEach(function(x){v[x.name]=x.value});var o=document.createElement('option');o.value=p.id;o.textContent=(v.dossierName||v.dossierId||p.processDefinitionName||'Dossier')+' — '+p.id.slice(0,8)+(p.endTime?' (terminé)':' (en cours)');sel.appendChild(o)});if(cur&&d.data.some(function(p){return p.id===cur}))sel.value=cur;else if(requestedInstance&&d.data.some(function(p){return p.id===requestedInstance}))sel.value=requestedInstance;if(!d.data.length&&requestedDossier)loadModel();if(!d.data.length)sel.innerHTML='<option value="">aucun historique moteur</option>';if(sel.value&&(requestedDossier||requestedInstance))load()}catch(e){document.getElementById('tl').textContent='Lecture impossible : '+e.message}}
 if(!requestedDossier&&!requestedInstance)loadModel();
 loadInstances();setInterval(loadInstances,10000);
@@ -831,6 +918,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const sig = (req.headers['x-plane-signature'] || '').trim();
       const out = await handleWebhook(body, sig);
+      jrec({ kind: 'webhook', method: 'POST', url: '/webhook/plane', req: body.toString('utf8').slice(0, 1400), status: 200, res: JSON.stringify(out).slice(0, 500) });
       return json(res, out.error === 'bad signature' ? 401 : out.error ? 400 : 200, out);
     }
     if (method === 'POST' && pathName === '/ingest/dossier') {
@@ -871,6 +959,10 @@ const server = http.createServer(async (req, res) => {
         } catch (eBoot) { log('inspector bootstrap warn', String(eBoot && eBoot.message).slice(0, 120)); bootstrap.error = 'Dossier introuvable ou réinitialisé — choisissez un dossier dans la liste.'; }
       }
       return html(res, 200, inspectorPage(bootstrap));
+    }
+    if (method === 'GET' && pathName.startsWith('/inspector/api/journal/')) {
+      const d = pathName.slice('/inspector/api/journal/'.length).replace(/\/$/, '');
+      return json(res, 200, { entries: API_JOURNAL.filter(x => x.d === d).slice(-120) });
     }
     if (method === 'GET' && pathName === '/inspector/api/model') {
       if (u.searchParams.get('definition')) return send(res, 200, await processTools.model(u.searchParams.get('definition')), 'application/xml; charset=utf-8');
