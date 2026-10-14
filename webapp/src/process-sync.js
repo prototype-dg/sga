@@ -52,7 +52,8 @@ function createTools({flowableApi, planeApi, CFG, log, ocrProjectId, stateAlias}
       const t = taskHistory.find(t => t.id === a.taskId);
       return {id:a.id, activityId:a.activityId, name:a.activityName, type:a.activityType, start:a.startTime, end:a.endTime, durationInMillis:a.durationInMillis, executionId:a.executionId, taskId:a.taskId, assignee:a.assignee || (t && t.assignee), deleteReason:(t && t.deleteReason) || a.deleteReason || null, evidence:a.activityType === 'serviceTask' ? 'Flowable serviceTask completed; demo variable expression only. No external call evidence.' : 'Flowable historic activity'};
     });
-    return {id:pid, processDefinitionId:detail.processDefinitionId, completed:!!detail.endTime, deleteReason:detail.deleteReason || null, start:detail.startTime, end:detail.endTime, activities, variables:variables(vars), tasks};
+    const flows = hist.filter(a => a.activityType === 'sequenceFlow' && a.endTime).map(a => ({id:a.activityId, name:a.activityName || null, start:a.startTime, end:a.endTime}));
+    return {id:pid, processDefinitionId:detail.processDefinitionId, completed:!!detail.endTime, deleteReason:detail.deleteReason || null, start:detail.startTime, end:detail.endTime, activities, flows, variables:variables(vars), tasks};
   }
   async function update(body, wi) {
     return serial(String(wi.id), async () => {
