@@ -45,7 +45,54 @@ class Command(BaseCommand):
         if False and opts['phase_board']:
             raise CommandError('Lossy phase-board mode disabled: retain exact manual statuses, use --board')
         self.base=opts['jira_url'].rstrip('/'); self.pat=opts['pat']
-        proj=Project.objects.get(id=opts['plane_project']); ws=proj.workspace
+        if opts['plane_project'] == 'auto':
+            _cand = Project.objects.filter(name__iexact='Octroi de Credit', deleted_at__isnull=True).order_by('-created_at').first()
+            if not _cand:
+                _dead = Project.objects.filter(name__iexact='Octroi de Credit', deleted_at__isnull=False).order_by('-created_at').first()
+                if _dead:
+                    _dead.deleted_at = None
+                    _dead.save(update_fields=['deleted_at'])
+                    _cand = _dead
+                    self.stdout.write('project resurrected after reset: %s (%s)' % (_dead.name, _dead.id))
+            if not _cand:
+                from plane.db.models import Workspace as _WS
+                _ws = _WS.objects.first()
+                _cand = Project.objects.create(name='Octroi de Credit', identifier='OCR', workspace=_ws, network=2,
+                                               description='Octroi de Credit - cree par la migration live depuis Jira DC')
+                self.stdout.write('project created by migration: %s (%s)' % (_cand.name, _cand.id))
+            proj = _cand; ws = proj.workspace
+            try:
+                from plane.db.models import Webhook as _WH
+                _URL = 'https://sga.andersenlab.com/webhook/plane'
+                _wh = _WH.objects.filter(workspace=ws, deleted_at__isnull=True).first()
+                if not _wh:
+                    _wh = _WH.objects.create(workspace=ws, url=_URL, secret_key='demo-secret-change-me', is_active=True, issue=True)
+                _ch = []
+                if _wh.url != _URL: _wh.url = _URL; _ch.append('url')
+                if not _wh.is_active: _wh.is_active = True; _ch.append('active')
+                if (_wh.secret_key or '') != 'demo-secret-change-me': _wh.secret_key = 'demo-secret-change-me'; _ch.append('secret')
+                if _wh.issue is not True: _wh.issue = True; _ch.append('issue')
+                if _ch: _wh.save()
+                _link = _wh.project_webhooks.filter(project_id=proj.id).first()
+                if not _link:
+                    _wh.project_webhooks.create(project_id=proj.id, workspace_id=proj.workspace_id); _ch.append('project-link')
+                elif _link.deleted_at is not None:
+                    _link.deleted_at = None; _link.save(); _ch.append('project-link-restored')
+                self.stdout.write('webhook ensure ok: %s' % (','.join(_ch) or 'no-change'))
+            except Exception as _we:
+                self.stdout.write('webhook ensure warn: %s' % str(_we)[:120])
+            try:
+                from plane.db.models import ProjectMember as _PM, WorkspaceMember as _WM
+                _n = 0
+                for _m in _WM.objects.filter(workspace_id=proj.workspace_id):
+                    if not _PM.objects.filter(project_id=proj.id, member_id=_m.member_id).exists():
+                        _PM.objects.create(project_id=proj.id, member_id=_m.member_id, workspace_id=proj.workspace_id, role=20, is_active=True); _n += 1
+                self.stdout.write('membership ensured: %d added' % _n)
+            except Exception as _me:
+                self.stdout.write('membership ensure warn: %s' % str(_me)[:120])
+            self.stdout.write('project auto-resolved: %s (%s)' % (proj.name, proj.id))
+        else:
+            proj=Project.objects.get(id=opts['plane_project']); ws=proj.workspace
         workflow=self.jira('/rest/api/2/project/'+urllib.parse.quote(opts['jira_project'])+'/statuses')
         statuses={str(s['id']):s for typ in workflow for s in typ['statuses']}
         board=self.jira('/rest/agile/1.0/board/%d/configuration'%opts['board'])
@@ -107,4 +154,9 @@ class Command(BaseCommand):
                 url=opts['inspector_url']+'?dossier='+str(item.id)
                 Issue.objects.filter(id=item.id).update(description_html=item.description_html+'<p><a href="'+html.escape(url,quote=True)+'" target="_blank" rel="noopener">Process Inspector — étape courante de ce dossier</a></p>')
                 created+=1; linked+=1
+        # post-step: remap every ticket to its Jira BOARD COLUMN state (Jira-like Kanban)
+        try:
+            exec(open('/code/plane/db/management/commands/_column_remap.py').read())
+        except Exception as _e:
+            self.stdout.write('column remap warn: %s' % _e)
         self.stdout.write(json.dumps({'alignedStatuses':count,'appendedLinks':linked,'createdIssues':created,'preservedIssues':skipped,'extraStatesPreserved':State.objects.filter(project=proj).exclude(id__in=[s.id for s in state_map.values()]).count()},ensure_ascii=False))
