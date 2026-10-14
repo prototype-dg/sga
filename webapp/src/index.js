@@ -205,7 +205,15 @@ function routeMocks(pathname, method, body, u, res) {
 }
 
 /* ---------------- Plane webhook handling ---------------- */
-const seen = new Map(); // idempotency
+const { pages: flowablePages, variables: normalizeVariables, graph: parseProcessGraph, createTools } = require('./process-sync');
+const processTools = createTools({ flowableApi, planeApi, CFG, log });
+const INSPECTOR_URL = ENV.INSPECTOR_PUBLIC_URL || 'https://sga.andersenlab.com/inspector';
+function escapeHtml(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+async function appendInspectorLink(wi, project) {
+  const url = INSPECTOR_URL + '?dossier=' + encodeURIComponent(wi.id);
+  if (String(wi.description_html || '').includes(url)) return;
+  await planeApi('PATCH', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${project}/work-items/${wi.id}/`, {description_html: (wi.description_html || '') + '<p><a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Process Inspector — étape courante de ce dossier</a></p>'});
+}
 let MIGRATED = false;        // Inspector shows the migrated model only after a successful workflow migration
 let SUPPRESS_WEBHOOK = false; // true during reset / bulk import: seeded + migrated dossiers carry no live case
 function findWorkItem(node, depth) {
@@ -219,45 +227,42 @@ async function handleWebhook(bodyBuf, signature) {
   let body = {};
   try { body = JSON.parse(bodyBuf.toString('utf8') || '{}'); } catch (e) { return { error: 'bad json' }; }
   const expected = crypto.createHmac('sha256', ENV.PLANE_WEBHOOK_SECRET || 'demo-secret-change-me').update(bodyBuf).digest('hex');
-  if (signature && signature !== expected) { log('webhook bad signature'); return { error: 'bad signature' }; }
+    if (!signature || signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) { log('webhook bad signature'); return { error: 'bad signature' }; }
   let ev = body.event || body.event_type || '';
-  if (ev === 'issue' && body.action) ev = 'workitem.' + (body.action === 'create' ? 'created' : body.action === 'update' ? 'updated' : body.action === 'delete' ? 'deleted' : body.action);
+  if (ev === 'issue' && body.action) ev = 'workitem.' + ({create:'created',update:'updated',delete:'deleted',created:'created',updated:'updated',deleted:'deleted'}[body.action] || body.action);
   log('webhook event', ev);
+  if (SUPPRESS_WEBHOOK) return { skipped: 'suppressed during reset/import' };
   if (ev === 'workitem.updated') {
-      const d0 = body.data || {};
-      const pid0 = String((d0.project && (d0.project.id || d0.project)) || '');
-      if (pid0.indexOf('78437061') === -1) return { skipped: 'not OCR project' };
-      let st = d0.state__name || (d0.state && d0.state.name) || '';
-      const iid0 = d0.id || (d0.work_item && d0.work_item.id) || '';
-      if (!st && iid0 && pid0) { try { const it = await planeApi('GET', '/api/v1/workspaces/sga/projects/' + pid0 + '/work-items/' + iid0 + '/'); st = (it.state && (it.state.name || it.state)) || ''; } catch (e0) { } }
-      log('webhook updated: dossier \u00ab ' + (d0.name || iid0) + ' \u00bb \u2192 \u00e9tat \u00ab ' + st + ' \u00bb');
-      try {
-        const pis = await flowableApi('GET', '/service/runtime/process-instances?size=20');
-        const inst = (pis.data || []).find(x => (x.processDefinitionId || '').indexOf('OCP_case') !== -1);
-        if (!inst) { log('aucune instance OCP_case active \u2014 rien \u00e0 avancer'); return { skipped: 'no instance' }; }
-        const ts = await flowableApi('GET', '/service/runtime/tasks?processInstanceId=' + inst.id);
-        const t = (ts.data || [])[0];
-        if (!t) { log('pas d\u2019\u00e9tape manuelle en attente (le processus est sur une \u00e9tape syst\u00e8me)'); return { skipped: 'no active task' }; }
-        await flowableApi('POST', '/service/runtime/tasks/' + t.id, { action: 'complete' });
-        log('\u00e9tape \u00ab ' + (t.name || t.taskDefinitionKey || t.id) + ' \u00bb compl\u00e9t\u00e9e \u2014 le processus avance (mouvement Plane \u2192 ' + st + ')');
-        return { ok: true, completed: t.name || t.id, to: st };
-      } catch (eAdv) { log('avance impossible: ' + eAdv.message); return { error: eAdv.message }; }
-    }
-    if (ev !== 'workitem.created') return { skipped: 'event ' + ev };
+    const wi = findWorkItem(body, 0);
+    if (!wi) return { skipped: 'no work item in payload' };
+    return processTools.update(body, wi);
+  }
+  if (ev !== 'workitem.created') return { skipped: 'event ' + ev };
   if (SUPPRESS_WEBHOOK) { log('webhook supprime (reset/import en cours)', ev); return { skipped: 'suppressed during reset/import' }; }
   const wi = findWorkItem(body, 0);
   if (!wi) { log('webhook skip: aucun work item dans le payload (keys=' + Object.keys(body).join(',') + ')'); return { skipped: 'no work item in payload' }; }
-  const proj = wi.project_id || wi.project || null;
+  const proj = wi.project_id || (wi.project && (wi.project.id || wi.project)) || null;
   if (!wi.id) { log('webhook skip: work item partiel (data=' + JSON.stringify(Object.keys(body.data || {})) + ')'); return { skipped: 'no work item in payload' }; }
   log('webhook work item', String(wi.name || wi.id), 'projet', String(proj || '?'));
   if (String(proj) !== String(CFG.planeCreditProject)) { log('webhook skip: autre projet', String(proj)); return { skipped: 'other project' }; }
-  let ci = null;
-  try {
-    ci = await flowableStartProcess('OCP_case', { dossierId: String(wi.id), dossierName: String(wi.name || ''), stateId: String(wi.state_id || '') });
-    log('flowable case started', ci.id);
-  } catch (e) { log('flowable start failed', e.message.slice(0, 160)); }
-  try { await planeComment(wi.id, proj, `Dossier ouvert par le moteur (réf. Flowable <i>${ci ? ci.id : 'n/a'}</i>) — comportement « post-fonction » natif.`); } catch (e) { log('comment warn', e.message.slice(0, 120)); }
-  return { ok: true, caseId: ci ? ci.id : null };
+  return processTools.serial(String(wi.id), async () => {
+    const item = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${proj}/work-items/${wi.id}/`);
+    await appendInspectorLink(item, proj);
+    const existing = await processTools.matches(wi.id, true);
+    if (existing.length) return { skipped: 'dossier already has process history', instanceIds: existing.map(p => p.id) };
+    const defs = await flowablePages(flowableApi, '/service/repository/process-definitions?key=OCP_case&latest=true');
+    if (defs.length !== 1) return { skipped: 'no unique workflow definition' };
+    const g = parseProcessGraph(await processTools.model(defs[0].id));
+    if (!g.safe) return { skipped: 'legacy unguarded workflow; creation refused' };
+    const stateId = typeof item.state === 'object' ? item.state.id : item.state_id || item.state;
+    const sp = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${proj}/states/`);
+    const state = (Array.isArray(sp) ? sp : sp.results || []).find(s => s.id === stateId);
+    const ts = g.tasks.filter(t => state && t.name === state.name);
+    if (ts.length !== 1) return { skipped: 'current Plane state has no exact workflow task' };
+    const ci = await flowableApi('POST', '/service/runtime/process-instances', {processDefinitionId:defs[0].id, businessKey:String(wi.id), variables:[{name:'dossierId',value:String(wi.id)},{name:'dossierName',value:String(item.name || '')},{name:'stateId',value:String(stateId)},{name:'initialTask',value:ts[0].id},{name:'selectedFlowId',value:''},{name:'migrationSnapshot',value:true}]});
+    log('flowable dossier snapshot started', wi.id, ci.id);
+    return {ok:true, caseId:ci.id};
+  });
 }
 
 /* ---------------- REST ingestion (mobile app / API) ---------------- */
@@ -316,7 +321,8 @@ fetch('/admin/exec',{method:'POST',headers:{'Content-Type':'application/json'},b
 </script></body></html>`;
 }
 
-function inspectorPage() {
+function inspectorPage(bootstrap = null) {
+  const bootstrapJson = JSON.stringify(bootstrap).replace(/</g, '\\u003c');
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>SGA — Process Inspector</title>
 <script src="/assets/bpmn-viewer.js"></script>
 <style>
@@ -331,16 +337,14 @@ h1{font-size:19px;color:#fff;display:flex;gap:10px;align-items:center}.dot{width
 .tl{max-height:210px;overflow-y:auto;font-size:12px;line-height:1.7}
 .tl .t{padding:3px 8px;border-left:2px solid #3a3a44;margin-bottom:2px}
 .tl .t.done{border-color:#28c840;color:#cfcfcf}.tl .t.act{border-color:#E9041E;color:#fff;background:rgba(233,4,30,.12);font-weight:600}
-.vars{font-size:12px;line-height:1.8}.vars b{color:#febc2e}
+.vars{font-size:12px;line-height:1.8;overflow-wrap:anywhere}.vars b{color:#febc2e}
 .log{font:11px/1.5 'SF Mono',Consolas,monospace;color:#9fd6a0;max-height:200px;overflow-y:auto;white-space:pre-wrap}
 select{background:#0c0c10;color:#e8e6e1;border:1px solid #2a2a33;border-radius:6px;padding:6px 8px;font-family:inherit;width:100%}
 .btn{background:#E9041E;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-family:inherit;font-weight:600;cursor:pointer;margin-top:8px}
 .empty{color:#6f6f78;font-size:12px}
 @keyframes pulse{0%,100%{fill-opacity:.55}50%{fill-opacity:.15}}
-.bjs-active rect{fill:#E9041E !important;fill-opacity:.4 !important;animation:pulse 1.6s infinite}
-.bjs-done rect{fill:#28c840 !important;fill-opacity:.28 !important}
-.bjs-done circle{fill:#28c840 !important;fill-opacity:.28 !important}
-.bjs-active circle{fill:#E9041E !important;fill-opacity:.4 !important}
+#canvas .djs-element.bjs-done .djs-visual > rect,#canvas .djs-element.bjs-done .djs-visual > circle{fill:#28c840 !important;fill-opacity:.6 !important;stroke:#28c840 !important;stroke-width:4px !important}
+#canvas .djs-element.bjs-active .djs-visual > rect,#canvas .djs-element.bjs-active .djs-visual > circle{fill:#E9041E !important;fill-opacity:.55 !important;stroke:#E9041E !important;stroke-width:5px !important;animation:pulse 1.6s infinite}
 
 .t-auto .djs-label{fill:#fff !important}
 .lbl-light .djs-label{fill:#e8e6e1 !important;paint-order:stroke !important;stroke:#0c0c10 !important;stroke-width:3px !important;stroke-linejoin:round !important}
@@ -360,13 +364,14 @@ svg defs marker path{fill:#b9bec9 !important;stroke:#b9bec9 !important}
 .edge-plate{fill:#14141a;opacity:.92}
 </style></head><body>
 <h1><span class="dot"></span>SGA Process Inspector — Octroi de Crédit</h1>
-<div class="sub"><span style="color:#6f6f78;font-size:10px;border:1px solid #2a2a33;border-radius:4px;padding:1px 6px">build 2026-10-09.5</span> Ce qui se passe DERRIÈRE chaque action : moteur Flowable en direct — étape courante du processus, historique d'exécution, variables du dossier, journal d'appels de la couche d'intégration.</div>
-<div class="grid"><div class="panel"><h2>Processus (BPMN)</h2><div style="position:relative"><div class="zbar"><button title="Zoom + (touche +)" onclick="zzoom(1.25)">+</button><button title="Zoom − (touche -)" onclick="zzoom(0.8)">−</button><button title="Ajuster (touche 0)" style="width:auto;padding:0 10px;font-size:11px" onclick="zfit()">fit</button></div><div id="canvas"></div></div><div class="legend"><span><i class="m"></i>Manuelle (agent)</span><span><i class="a"></i>Auto — appel externe (EN: external call)</span><span><i class="i"></i>Auto — interne (EN: internal)</span><span>Cliquez une étape pour le détail</span></div></div>
-<div><div class="panel"><h2>Dossiers en cours (Flowable)</h2><select id="inst"><option value="">— chargement…</option></select><button class="btn" onclick="load()">Inspecter</button></div>
+<div class="sub"><span style="color:#6f6f78;font-size:10px;border:1px solid #2a2a33;border-radius:4px;padding:1px 6px">build 2026-10-13.safe-sync.1</span> Ce qui se passe DERRIÈRE chaque action : moteur Flowable en direct — étape courante du processus, historique d'exécution, variables du dossier, journal d'appels de la couche d'intégration.</div>
+<div class="grid"><div class="panel"><h2>Processus (BPMN)</h2><div style="position:relative"><div class="zbar"><button title="Zoom + (touche +)" onclick="zzoom(1.25)">+</button><button title="Zoom − (touche -)" onclick="zzoom(0.8)">−</button><button title="Ajuster (touche 0)" style="width:auto;padding:0 10px;font-size:11px" onclick="zfit()">fit</button></div><div id="canvas"></div></div><div class="legend"><span><i class="m"></i>Manuelle (agent)</span><span><i class="a"></i>Automatisation simulée</span><span><i class="i"></i>Expression moteur</span><span>Cliquez une étape pour le détail</span></div></div>
+<div><div class="panel"><h2>Dossiers et historique (Flowable)</h2><select id="inst"><option value="">— chargement…</option></select><button class="btn" onclick="load()">Inspecter</button></div>
 <div class="panel" style="margin-top:12px"><h2>Étapes du parcours</h2><div class="tl" id="tl"><span class="empty">Choisissez un dossier puis « Inspecter ».</span></div></div>
 <div class="panel" style="margin-top:12px"><h2>Variables du dossier</h2><div class="vars" id="vars"><span class="empty">—</span></div></div><div class="panel" style="margin-top:12px"><h2>Détail de l'étape</h2><div class="vars" id="detail"><span class="empty">Cliquez sur une étape du diagramme.</span></div></div></div></div>
 <div class="panel" style="margin-top:12px"><h2>Journal de la couche d'intégration (temps réel)</h2><div class="log" id="log">…</div></div>
 <script>
+var bootstrap=${bootstrapJson};
 var viewer=null;
 function showErr(m){var c=document.getElementById('canvas');if(c)c.innerHTML='<div style="color:#ff6b6b;font:12px monospace;padding:14px">BPMN : '+String(m).replace(/</g,'&lt;')+'</div>'}
 var modelLoaded=false;
@@ -381,10 +386,13 @@ var v=window._curVars||{};var ref=null;var nm2=String(v.dossierName||'');var p2=
 var planeUrl='https://sga-plane.andersenlab.com/sga/projects/78437061-9397-42f4-9224-5e3f6b46a7c5/';
 var url=ref?('http://74.162.153.131:8080/issues/?jql='+encodeURIComponent('summary ~ "'+ref+'"')):'http://74.162.153.131:8080/jira/software/c/projects/OCP';
 
-var h='<div><b>'+(el.businessObject.name||el.id)+'</b></div>';
-h+='<div style="margin:4px 0"><span style="color:'+(isExt?'#E9041E':isInt?'#E9741E':'#28c840')+';font-weight:600">'+(isExt?'AUTOMATIQUE — APPEL SYSTEME EXTERNE (WSO2/REST)':isInt?'AUTOMATIQUE — OPERATION SYSTEME INTERNE':'MANUELLE (agent)')+'</span>'+(enName?'<span style="color:#9a9a9a;font-weight:400"> — EN: '+enName+'</span>':'')+'</div>';
-h+='<div style="color:#9a9a9a;font-size:11px;line-height:1.6">'+doc+'</div>';
-if(isExt){h+='<div style="margin-top:6px;font:11px monospace;color:#febc2e">bridge appliBridge > middleware > WSO2/REST vers le SI partenaire | EN: external system call via appliBridge</div>'}else if(isInt){h+='<div style="margin-top:6px;font:11px monospace;color:#febc2e">bridge appliBridge > operation interne du SI SGA | EN: internal system operation</div>'}else{h+='<div style="margin-top:6px">Dossier courant : '+(ref||'-')+'<br><a href="'+planeUrl+'" target="_blank" rel="noopener" style="color:#7fd1ff;text-decoration:underline">Ouvrir dans Plane</a> · <a href="'+url+' target="_blank" style="color:#E9041E">Ouvrir le dossier dans Jira</a></div>'}
+var h='<div><b>'+safe(el.businessObject.name||el.id)+'</b></div>';
+h+='<div style="margin:4px 0"><span style="color:'+(isExt?'#E9041E':isInt?'#E9741E':'#28c840')+';font-weight:600">'+(isExt?'AUTOMATIQUE — SIMULATION (pas d’appel externe)':isInt?'AUTOMATIQUE — EXPRESSION MOTEUR (simulation)':'MANUELLE (agent)')+'</span>'+(enName?'<span style="color:#9a9a9a;font-weight:400"> — EN: '+enName+'</span>':'')+'</div>';
+h+='<div style="color:#9a9a9a;font-size:11px;line-height:1.6">'+safe(doc)+'</div>';
+h+='<div style="margin-top:6px">Dossier : '+safe(v.dossierId||requestedDossier||'—')+'</div>';
+if(isAuto)h+='<div>Simulation moteur : aucun appel externe démontré.</div>';
+h+=executionDetail(el.id);
+if(v.dossierId)h+='<div><a href="'+safe(planeUrl+'issues/'+encodeURIComponent(v.dossierId))+'" target="_blank" rel="noopener">Ouvrir ce dossier dans Plane</a></div>';
 document.getElementById('detail').innerHTML=h})}catch(e){}}
 var stEl2=document.createElement('span');stEl2.id='st-inst';stEl2.style.cssText='font-size:11px;margin-left:8px;color:#6f6f78';stEl2.textContent='…';document.querySelector('.sub').appendChild(stEl2);
 var stEl=document.createElement('span');stEl.id='st-model';stEl.style.cssText='color:#febc2e;font-size:11px;margin-left:8px';stEl.textContent='\u23f3 en attente de migration \u2014 v\u00e9rification toutes les 5 s';document.querySelector('.sub').appendChild(stEl);
@@ -408,17 +416,19 @@ document.addEventListener('keydown',function(ev){if(ev.key==='+'||ev.key==='=')z
     setTimeout(loadModel,5000);}
   else {showErr('chargement du modele: '+m);setTimeout(loadModel,10000);}
 })}
-loadModel();
-function loadInstances(){fetch('/inspector/api/instances?t='+Date.now()).then(function(r){return r.json()}).then(function(d){var sel=document.getElementById('inst');var cur=sel.value;var opts=(d.data||[]);sel.innerHTML='';opts.forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=(p.processDefinitionName||p.processDefinitionKey)+' — '+p.id.slice(0,8);sel.appendChild(o)});if(cur&&opts.some(function(p){return p.id===cur}))sel.value=cur;if(!opts.length){sel.innerHTML='<option value="">aucun processus actif</option>'}
-var ct=document.getElementById('st-inst');if(ct){ct.textContent=opts.length?('\u2713 '+opts.length+' dossier(s) en cours'):'0 dossier en cours';ct.style.color=opts.length?'#28c840':'#6f6f78'}}).catch(function(e){})}
+var requestedDossier=new URLSearchParams(location.search).get('dossier');
+var requestedInstance=new URLSearchParams(location.search).get('instance');
+var loadedDefinition=null, loadGeneration=0;
+function safe(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function checked(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
+function executionDetail(id){var rows=(window._activities||[]).filter(function(a){return a.activityId===id});if(!rows.length)return '<div>Non exécutée dans cette instance.</div>';return rows.map(function(a){return '<div style="margin-top:8px"><b>'+safe(a.deleteReason?'Terminée / supprimée':a.end?'Terminée':'En cours')+'</b><br>Début : '+safe(a.start)+'<br>Fin : '+safe(a.end||'—')+'<br>Durée (ms) : '+safe(a.durationInMillis==null?'—':a.durationInMillis)+'<br>Exécution : '+safe(a.executionId)+'<br>Tâche : '+safe(a.taskId||'—')+'<br>Agent : '+safe(a.assignee||'non enregistré')+'<br>Motif de suppression : '+safe(a.deleteReason||'—')+'<br>Preuve : '+safe(a.evidence)+'</div>'}).join('')}
+function paint(){if(!viewer)return;try{var cv=viewer.get('canvas');viewer.get('elementRegistry').getAll().forEach(function(el){cv.removeMarker(el.id,'bjs-done');cv.removeMarker(el.id,'bjs-active')});var by={};(window._activities||[]).forEach(function(a){by[a.activityId]=by[a.activityId]||{done:false,active:false};if(a.end&&!a.deleteReason)by[a.activityId].done=true;else if(!a.end)by[a.activityId].active=true});Object.keys(by).forEach(function(id){if(by[id].active||by[id].done)cv.addMarker(id,by[id].active?'bjs-active':'bjs-done')})}catch(e){}}
+function renderData(d){window._curVars=d.variables||{};window._activities=d.activities||[];var tl=document.getElementById('tl');tl.innerHTML='';var summary=document.createElement('div');summary.textContent='Instance '+d.id+' — '+(d.completed?'terminée':'en cours');tl.appendChild(summary);(d.activities||[]).forEach(function(a){var e=document.createElement('div');e.className='t '+(a.end?'done':'act');e.textContent=(a.deleteReason?'Supprimée : ':a.end?'Terminée : ':'En cours : ')+(a.name||a.activityId)+' — '+(a.end||a.start||'');e.onclick=function(){document.getElementById('detail').innerHTML=executionDetail(a.activityId)};tl.appendChild(e)});document.getElementById('vars').innerHTML=Object.keys(d.variables||{}).map(function(k){return '<div><b>'+safe(k)+'</b> : '+safe(typeof d.variables[k]==='object'?JSON.stringify(d.variables[k]):d.variables[k])+'</div>'}).join('')||'Aucune variable enregistrée';paint();var current=(d.tasks||[])[0];if(current)document.getElementById('detail').innerHTML='<b>Étape courante : '+safe(current.name||current.taskDefinitionKey)+'</b>'+executionDetail(current.taskDefinitionKey);else if(d.completed)document.getElementById('detail').textContent=d.deleteReason?'Instance terminée par suppression : '+d.deleteReason:'Instance terminée';}
+async function loadInstances(){try{var d;if(requestedDossier){d=bootstrap&&bootstrap.dossier?bootstrap.dossier:await fetch('/inspector/api/dossier/'+encodeURIComponent(requestedDossier)).then(checked);if(bootstrap)bootstrap.dossier=null;window._dossier=d;document.getElementById('st-inst').textContent=d.name+' — état Plane : '+d.state;d={data:d.instances};if(!d.data.length){window._activities=[];window._curVars={dossierId:requestedDossier};paint();document.getElementById('tl').textContent=window._dossier.reason;document.getElementById('detail').textContent='État courant Plane : '+window._dossier.state+' (pas une preuve d’exécution Flowable)'}}else{d=await fetch('/inspector/api/instances').then(checked)}var sel=document.getElementById('inst'),cur=sel.value;sel.innerHTML='';(d.data||[]).forEach(function(p){var v={};(p.variables||[]).forEach(function(x){v[x.name]=x.value});var o=document.createElement('option');o.value=p.id;o.textContent=(v.dossierName||v.dossierId||p.processDefinitionName||'Dossier')+' — '+p.id.slice(0,8)+(p.endTime?' (terminé)':' (en cours)');sel.appendChild(o)});if(cur&&d.data.some(function(p){return p.id===cur}))sel.value=cur;else if(requestedInstance&&d.data.some(function(p){return p.id===requestedInstance}))sel.value=requestedInstance;if(!d.data.length&&requestedDossier)loadModel();if(!d.data.length)sel.innerHTML='<option value="">aucun historique moteur</option>';if(sel.value&&(requestedDossier||requestedInstance))load()}catch(e){document.getElementById('tl').textContent='Lecture impossible : '+e.message}}
+if(!requestedDossier&&!requestedInstance)loadModel();
 loadInstances();setInterval(loadInstances,10000);
-function load(){var id=document.getElementById('inst').value;if(!id)return;window._curId=id;
-fetch('/inspector/api/instance/'+id+'?t='+Date.now()).then(function(r){return r.json()}).then(function(d){window._curVars={};Object.keys(d.variables||{}).forEach(function(k){var v=d.variables[k];window._curVars[k]=(v&&v.value!==undefined)?v.value:v});
- var tl=document.getElementById('tl');tl.innerHTML='';
- (d.activities||[]).forEach(function(a){var e=document.createElement('div');e.className='t '+(a.end? 'done':'act');e.textContent=(a.end?'✓ ':'▶ ')+(a.name||a.activityId||'?')+'  '+(a.start? a.start.slice(11,19):'');tl.appendChild(e);
-  try{viewer.get('canvas').addMarker(a.activityId,a.end?'bjs-done':'bjs-active')}catch(e){}});
- var vs='';Object.keys(d.variables||{}).forEach(function(k){vs+='<div><b>'+k+'</b> : '+(d.variables[k]&&d.variables[k].value!==undefined?d.variables[k].value:d.variables[k])+'</div>'});
- document.getElementById('vars').innerHTML=vs||'<span class="empty">—</span>';});}
+async function load(){var id=document.getElementById('inst').value;if(!id)return;var generation=++loadGeneration;window._curId=id;try{var d=bootstrap&&bootstrap.instance&&bootstrap.instance.id===id?bootstrap.instance:await fetch('/inspector/api/instance/'+encodeURIComponent(id)+(requestedDossier?'?dossier='+encodeURIComponent(requestedDossier):'')).then(checked);if(bootstrap)bootstrap.instance=null;renderData(d);if(generation!==loadGeneration)return;if(loadedDefinition!==d.processDefinitionId){var x;if(bootstrap&&bootstrap.model){x=bootstrap.model;bootstrap.model=null}else{var r=await fetch('/inspector/api/model?definition='+encodeURIComponent(d.processDefinitionId));if(!r.ok)throw new Error('Modèle HTTP '+r.status);x=await r.text()}if(!viewer){viewer=new BpmnJS({container:'#canvas'});bindClick()}await viewer.importXML(x);loadedDefinition=d.processDefinitionId;modelLoaded=true;stEl.textContent='Modèle exact de cette instance';colorize();edgeLabels();zfit()}if(generation!==loadGeneration)return;renderData(d)}catch(e){document.getElementById('tl').textContent='Lecture impossible : '+e.message}}
+setInterval(function(){if(window._curId)load()},5000);
 setInterval(function(){fetch('/inspector/api/log?t='+Date.now()).then(function(r){return r.text()}).then(function(t){document.getElementById('log').textContent=t.slice(-3000)})},3000);
 </script></body></html>`;
 }
@@ -531,46 +541,15 @@ function migSnap() {
   return { running: migJob.running, phase: migJob.phase, done: migJob.done, total: migJob.total, errors: migJob.errors.slice(0, 5), result: migJob.result, startedAt: migJob.startedAt, finishedAt: migJob.finishedAt };
 }
 async function runMigrationJob() {
-  migJob.running = true; migJob.startedAt = Date.now(); migJob.finishedAt = null; migJob.done = 0; migJob.total = 0; migJob.errors = []; migJob.result = null; migJob.phase = 'reading Jira';
+  migJob.running = true; migJob.phase = 'non-destructive workflow and Jira alignment'; migJob.errors = [];
+  SUPPRESS_WEBHOOK = true;
   try {
-    const sr = await jiraApi('POST', '/rest/api/2/search', { jql: `project = ${CFG.jiraProject}`, maxResults: 100, fields: ['summary', 'status', 'description'] });
-    const issues = sr.issues || [];
-    migJob.total = issues.length;
-    let states = [];
-    try { const sp = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/states/`); states = sp.results || sp || []; } catch (e) { migJob.errors.push('states: ' + e.message.slice(0, 100)); }
-    const smap = {};
-    for (const st of states) if (st && st.name && st.id) smap[nkey(st.name)] = st.id;
-    migJob.phase = 'wiping Plane OCR';
-    try {
-      const prior = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/work-items/?per_page=100`);
-      for (const wi of (prior.results || prior || [])) { try { await planeApi('DELETE', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/work-items/${wi.id}/`); } catch (e) { } }
-    } catch (e) { migJob.errors.push('wipe: ' + e.message.slice(0, 100)); }
-    let ok = 0, mapped = 0;
-    for (const it of issues) {
-      const f = it.fields || {};
-      const stName = f.status && f.status.name;
-      const sid = smap[nkey(stName)];
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const desc = String(f.description || '').slice(0, 400).replace(/[<>]/g, ' ');
-          const wi = await planeCreateWorkItem(CFG.planeCreditProject, { name: f.summary || ('Dossier ' + it.key), description_html: `<p>${desc}</p><p><i>Migré depuis Jira ${it.key} — statut source : ${stName || '?'}</i></p>`, work_item_type: 'dossier-credit', properties: { jira_key: it.key, jira_status: stName || null } });
-          if (sid) { try { await planeSetState(wi.id, sid, CFG.planeCreditProject); mapped++; } catch (e) { } }
-          ok++; break;
-        } catch (e) {
-          if (/429|throttl|rate/i.test(e.message) && attempt < 2) { await new Promise(r => setTimeout(r, 30000)); continue; }
-          migJob.errors.push(it.key + ': ' + e.message.slice(0, 120)); break;
-        }
-      }
-      migJob.done++; migJob.phase = `migrating ${migJob.done}/${migJob.total}`;
-      await new Promise(r => setTimeout(r, 400));
-    }
-    migJob.result = { migrated: ok, stateMapped: mapped, jiraTotal: issues.length, statesAvailable: states.map(x => x.name).slice(0, 15) };
-  } catch (e) { migJob.errors.push('fatal: ' + e.message.slice(0, 200)); }
-  migJob.phase = migJob.errors.length ? 'error' : 'done';
-  migJob.running = false; migJob.finishedAt = Date.now();
-  log('migration job finished', migJob.phase);
+    const out = await agentRun('jira-import');
+    if (!out || out.exit !== 0) throw new Error('agent migration failed');
+    MIGRATED = true; migJob.result = out; migJob.phase = 'done';
+  } catch (e) { migJob.errors.push(e.message); migJob.phase = 'error'; }
+  finally { SUPPRESS_WEBHOOK = false; migJob.running = false; migJob.finishedAt = Date.now(); }
 }
-
 /* ---------------- Live status ---------------- */
 async function liveStatus() {
   const st = { middleware: 'ok', plane: 'down', flowable: 'down', jira: 'skipped', workItems: null, jiraIssues: null };
@@ -772,7 +751,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const sig = (req.headers['x-plane-signature'] || '').trim();
       const out = await handleWebhook(body, sig);
-      return json(res, 200, out);
+      return json(res, out.error === 'bad signature' ? 401 : out.error ? 400 : 200, out);
     }
     if (method === 'POST' && pathName === '/ingest/dossier') {
       const body = JSON.parse((await readBody(req)).toString('utf8') || '{}');
@@ -792,8 +771,27 @@ const server = http.createServer(async (req, res) => {
     }
     if (method === 'GET' && pathName === '/migrate/status') return json(res, 200, migSnap());
     if (method === 'GET' && pathName === '/terminal') return html(res, 200, execPage());
-    if (method === 'GET' && pathName === '/inspector') return html(res, 200, inspectorPage());
+    if (method === 'GET' && pathName === '/inspector') {
+      let bootstrap = null;
+      const dossier = u.searchParams.get('dossier'); const instanceId = u.searchParams.get('instance');
+      if (dossier || instanceId) {
+        bootstrap = {};
+        if (dossier && /^[a-f0-9-]{36}$/i.test(dossier)) {
+          const item = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/work-items/${dossier}/`);
+          const sp = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/states/`);
+          const sid = typeof item.state === 'object' ? item.state.id : item.state;
+          const state = (Array.isArray(sp) ? sp : sp.results || []).find(s => s.id === sid);
+          const instances = await processTools.matches(dossier, true);
+          bootstrap.dossier = {dossierId:dossier,name:item.name,state:state ? state.name : sid,instances,reason:instances.length ? null : 'Aucun historique Flowable; état Plane observé uniquement.'};
+          const chosen = instanceId ? instances.find(p => p.id === instanceId) : instances.length === 1 ? instances[0] : null;
+          if (chosen) bootstrap.instance = await processTools.inspect(chosen.id);
+        } else if (!dossier && instanceId) bootstrap.instance = await processTools.inspect(instanceId);
+        if (bootstrap.instance) bootstrap.model = await processTools.model(bootstrap.instance.processDefinitionId);
+      }
+      return html(res, 200, inspectorPage(bootstrap));
+    }
     if (method === 'GET' && pathName === '/inspector/api/model') {
+      if (u.searchParams.get('definition')) return send(res, 200, await processTools.model(u.searchParams.get('definition')), 'application/xml; charset=utf-8');
       if (!MIGRATED) {
         try {
           const defs = await flowableApi('GET', '/service/repository/process-definitions?latest=false&size=200');
@@ -808,15 +806,26 @@ const server = http.createServer(async (req, res) => {
       const xml = fs.readFileSync(path.join(__dirname, 'assets', 'OCP_case.bpmn'), 'utf8');
       return send(res, 200, xml, 'application/xml; charset=utf-8');
     }
-    if (method === 'GET' && pathName === '/inspector/api/instances') return json(res, 200, await flowableApi('GET', '/service/runtime/process-instances?size=20&includeProcessVariables=true'));
+    // All inspector endpoints are read-only, including dossier deep links.
+    if (method === 'GET' && pathName === '/inspector/api/instances') {
+      const data = await flowablePages(flowableApi, '/service/history/historic-process-instances?includeProcessVariables=true');
+      return json(res, 200, {data:data.filter(p => String(p.processDefinitionId).startsWith('OCP_case:'))});
+    }
+    if (method === 'GET' && pathName.startsWith('/inspector/api/dossier/')) {
+      const dossier = decodeURIComponent(pathName.split('/').pop());
+      if (!/^[a-f0-9-]{36}$/i.test(dossier)) return json(res, 400, {error:'invalid dossier ID'});
+      const item = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/work-items/${dossier}/`);
+      const sp = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/states/`);
+      const sid = typeof item.state === 'object' ? item.state.id : item.state;
+      const state = (Array.isArray(sp) ? sp : sp.results || []).find(s => s.id === sid);
+      const instances = await processTools.matches(dossier, true);
+      return json(res, 200, {dossierId:dossier,name:item.name,state:state ? state.name : sid,instances,reason:instances.length ? null : 'Aucun historique Flowable pour ce dossier. État Plane observé uniquement; aucun parcours inventé.'});
+    }
     if (method === 'GET' && pathName.startsWith('/inspector/api/instance/')) {
-      const pid = pathName.split('/').pop();
-      const [hist, det] = await Promise.all([
-        flowableApi('GET', `/service/history/historic-activity-instances?processInstanceId=${pid}`).catch(() => ({ data: [] })),
-        flowableApi('GET', `/service/runtime/process-instances/${pid}?includeProcessVariables=true`).catch(() => ({})),
-      ]);
-      const acts = (hist.data || []).filter(a => a.activityType !== 'sequenceFlow').sort((a, b) => String(a.startTime).localeCompare(String(b.startTime))).map(a => ({ activityId: a.activityId, name: a.activityName, type: a.activityType, start: a.startTime, end: a.endTime }));
-      return json(res, 200, { id: pid, activities: acts, variables: det.variables || {} });
+      const pid = decodeURIComponent(pathName.split('/').pop());
+      const detail = await processTools.inspect(pid);
+      if (u.searchParams.get('dossier') && detail.variables.dossierId !== u.searchParams.get('dossier')) return json(res, 409, {error:'instance does not belong to requested dossier'});
+      return json(res, 200, detail);
     }
     if (method === 'GET' && pathName === '/inspector/api/log') return send(res, 200, RING.slice(-100).join(String.fromCharCode(10)), 'text/plain; charset=utf-8');
     if (method === 'POST' && pathName === '/admin/exec') {
