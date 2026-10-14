@@ -238,6 +238,11 @@ async function appendInspectorLink(wi, project) {
   if (String(wi.description_html || '').includes(url)) return;
   await planeApi('PATCH', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${project}/work-items/${wi.id}/`, {description_html: (wi.description_html || '') + '<p><a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Process Inspector — étape courante de ce dossier</a></p>'});
 }
+function isMobileItem(wi) {
+  if (!wi || typeof wi !== 'object') return false;
+  if (String(wi.work_item_type || wi.type || '') === 'dossier-credit') return true;
+  return /application mobile/i.test(String(wi.description_html || wi.description || ''));
+}
 let MIGRATED = false;        // Inspector shows the migrated model only after a successful workflow migration
 let SUPPRESS_WEBHOOK = false; // true during reset / bulk import: seeded + migrated dossiers carry no live case
 function findWorkItem(node, depth) {
@@ -259,10 +264,11 @@ async function handleWebhook(bodyBuf, signature) {
   if (ev === 'workitem.updated') {
     const wi = findWorkItem(body, 0);
     if (!wi) return { skipped: 'no work item in payload' };
+    if (SUPPRESS_WEBHOOK && !isMobileItem(wi)) return { skipped: 'suppressed during reset/import' };
     return processTools.update(body, wi);
   }
   if (ev !== 'workitem.created') return { skipped: 'event ' + ev };
-  if (SUPPRESS_WEBHOOK) { log('webhook supprime (reset/import en cours)', ev); return { skipped: 'suppressed during reset/import' }; }
+  if (SUPPRESS_WEBHOOK && !isMobileItem(wi)) { log('webhook supprime (reset/import en cours)', ev); return { skipped: 'suppressed during reset/import' }; }
   const wi = findWorkItem(body, 0);
   if (!wi) { log('webhook skip: aucun work item dans le payload (keys=' + Object.keys(body).join(',') + ')'); return { skipped: 'no work item in payload' }; }
   let proj = wi.project_id || (wi.project && (wi.project.id || wi.project)) || null;
@@ -276,6 +282,7 @@ async function handleWebhook(bodyBuf, signature) {
     await appendInspectorLink(item, proj);
     const existing = await processTools.matches(wi.id, true);
     if (existing.length) return { skipped: 'dossier already has process history', instanceIds: existing.map(p => p.id) };
+    if (!isMobileItem(item)) return { skipped: 'migrated dossier: Plane-state inspection only, no engine history' };
     return startDossierCase(item, proj);
   });
 }
@@ -909,7 +916,7 @@ const server = http.createServer(async (req, res) => {
         const out = await agentRun(id, bulk ? 1500000 : undefined);
         if (out && out.exit === 0 && ['workflow-migrate', 'jira-dry', 'jira-import', 'jira-import-wipe', 'jira-import-phases'].indexOf(id) !== -1) MIGRATED = true;
         return json(res, 200, out);
-      } catch (e) { return json(res, 502, { error: e.message.slice(0, 160) }); } finally { if (bulk) setTimeout(function () { SUPPRESS_WEBHOOK = false; log('fenetre de suppression webhook fermee (90s)'); }, 90000); }
+      } catch (e) { return json(res, 502, { error: e.message.slice(0, 160) }); } finally { if (bulk) { SUPPRESS_WEBHOOK = false; log('fenetre de suppression webhook fermee (fin import)'); } }
     }
     if (method === 'GET' && pathName === '/status') return json(res, 200, await liveStatus());
     if (pathName.startsWith('/mock/')) return routeMocks(pathName, method, req.method === 'POST' ? safeJson((await readBody(req)).toString('utf8')) : null, u, res);
