@@ -95,7 +95,9 @@ function createTools({flowableApi, planeApi, CFG, log, ocrProjectId, stateAlias,
       if (tasks.length !== 1) return {skipped:'ambiguous active tasks', count:tasks.length};
       const task = tasks[0]; const source = g.tasks.find(t => t.id === task.taskDefinitionKey);
       const sourceState = (Array.isArray(states) ? states : states.results || []).find(s => String(s.id) === String(oldId));
-      if (!source || !sourceState || (source.name !== sourceState.name && source.name !== alias(sourceState.name))) return {skipped:'active task does not match source state'};
+      if (!source) return {skipped:'active task does not match source state'};
+      if (sourceState && source.name !== sourceState.name && source.name !== alias(sourceState.name)) return {skipped:'active task does not match source state'};
+      if (!sourceState) log('source state row missing (stale id); trusting engine position', source && source.name);
       const targetName = alias(target.name);
       const eventKey = cryptoHash([wi.id,oldId,newId,task.id].join(':'));
       let cur = task; const hops = [];
