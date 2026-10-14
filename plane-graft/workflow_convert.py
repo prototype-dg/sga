@@ -24,13 +24,13 @@ for s in root.iter('step'):
             to = res.get('step')
             if to:
                 edges.append((sn, a.get('name'), steps.get(to, to)))
-commons = root.find('commons')
+commons = root.find('common-actions')
 if commons is not None:
-    common_actions = {a.get('name'): a for a in commons.iter('action')}
+    common_actions = {a.get('id'): a for a in commons.iter('action')}
     for s in root.iter('step'):
         sn = s.get('name')
         for ref in s.iter('common-action'):
-            ca = common_actions.get(ref.get('name'))
+            ca = common_actions.get(ref.get('id'))
             if ca is None:
                 continue
             for res in ca.iter('unconditional-result'):
@@ -58,7 +58,10 @@ def esc(x):
 
 
 names = list(steps.values())
-START = 'Demande Re\u00e7ue'
+initial_results = root.findall('./initial-actions/action/results/unconditional-result')
+if len(initial_results) != 1 or initial_results[0].get('step') not in steps:
+    raise ValueError('Initial workflow result is ambiguous or missing')
+START = steps[initial_results[0].get('step')]
 appli = [(f, n, t) for (f, n, t) in uniq if '[APPLI]' in n]
 plain = [(f, n, t) for (f, n, t) in uniq if '[APPLI]' not in n]
 
@@ -118,18 +121,15 @@ EXT_APPLI = {'[APPLI] - Constituer dossier - Demander garanties', '[APPLI] - Dé
 # ---------------- BPMN elements ----------------
 O = []
 O.append('<?xml version="1.0" encoding="UTF-8"?>')
-O.append('<definitions xmlns:bioc="http://bpmn.io/schema/bpmn/bioc" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:flowable="http://flowable.org/bpmn" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" targetNamespace="http://flowable.org/sga">')
+O.append('<definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bioc="http://bpmn.io/schema/bpmn/bioc" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:flowable="http://flowable.org/bpmn" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" targetNamespace="http://flowable.org/sga">')
 O.append('  <process id="OCP_case" name="Octroi de Credit (migr\u00e9 depuis Jira)">')
 O.append('    <startEvent id="start" name="Cr\u00e9ation dossier (APPLI)"/>')
 for nm in names:
-    docu = "FR: " + nm + " - etape manuelle (agent), groupe SGA-" + nm.split()[0] + ", traitement dans Jira. EN: " + EN_STEP.get(nm, nm) + " - manual step (agent), handled in Jira."
+    docu = "FR: " + nm + " - etape manuelle dans Plane; transition explicite requise. EN: " + EN_STEP.get(nm, nm) + " - manual step; explicit transition required. Jira validators, permissions and SIL functions are NOT executed by this demo."
     O.append('    <userTask id="%s" name="%s" flowable:candidateGroups="SGA-%s"><documentation>%s</documentation></userTask>' % (sid(nm), esc(nm), esc(nm.split()[0]), esc(docu)))
 for k, (f, n, t) in enumerate(appli):
-    if n in EXT_APPLI:
-        doca = "FR: " + n + " - AUTOMATISATION : appel systeme EXTERNE via bridge appliBridge (middleware, WSO2/REST vers le SI partenaire). EN: " + EN_APPLI.get(n, n) + " - EXTERNAL system call (WSO2/REST to partner SI)."
-    else:
-        doca = "FR: " + n + " - AUTOMATISATION : operation systeme INTERNE via bridge appliBridge (middleware, SI SGA). EN: " + EN_APPLI.get(n, n) + " - INTERNAL system operation."
-    O.append("    <serviceTask id=\"appli_%d\" name=\"%s\" flowable:expression=\"${execution.setVariable('appliBridgeCalled', true)}\"><documentation>%s</documentation></serviceTask>" % (k, esc(n), esc(doca)))
+    doca = "FR: " + n + " - SIMULATION uniquement: le moteur enregistre une variable; aucun appel externe ni fonction SIL execute. EN: " + EN_APPLI.get(n, n) + " - simulation only, no external call."
+    O.append("    <serviceTask id=\"appli_%d\" name=\"%s\" flowable:expression=\"${execution.setVariable('lastSimulatedAction', '%s')}\"><documentation>%s</documentation></serviceTask>" % (k, esc(n), 'appli_%d' % k, esc(doca)))
 O.append('    <endEvent id="end" name="Fin de parcours"/>')
 
 flows = []          # (fid, a, b) over node ids
@@ -139,17 +139,31 @@ seen_pair = set()   # dedupe parallel (a,b) pairs for a clean visual
 def flow(a, b, name=None):
     if a == b:
         name = name or None
-    key = (a, b)
+    key = (a, b, name)
     if key in seen_pair:
         return
     seen_pair.add(key)
     fid = 'flow_%d' % (len(flows) + 1)
     nattr = (' name="%s"' % esc(name)) if name else ''
-    O.append('    <sequenceFlow id="%s" sourceRef="%s" targetRef="%s"%s/>' % (fid, a, b, nattr))
+    condition = None
+    if a.startswith('task_'):
+        condition = "${selectedFlowId == '%s'}" % fid
+    elif a == 'snapshot':
+        condition = "${initialTask == '%s'}" % b
+    if condition:
+        O.append('    <sequenceFlow id="%s" sourceRef="%s" targetRef="%s"%s><conditionExpression xsi:type="tFormalExpression"><![CDATA[%s]]></conditionExpression></sequenceFlow>' % (fid, a, b, nattr, condition))
+    else:
+        O.append('    <sequenceFlow id="%s" sourceRef="%s" targetRef="%s"%s/>' % (fid, a, b, nattr))
     flows.append((fid, a, b))
 
 
-flow('start', sid(START))
+# Imported dossiers start at their observed status, never replay a guessed path.
+# This is a migration snapshot; past Jira actions are not Flowable history.
+# A snapshot gateway prevents multiple unconditional start-event branches.
+O.append('    <exclusiveGateway id="snapshot" name="État initial observé"/>')
+flow('start', 'snapshot')
+for nm in names:
+    flow('snapshot', sid(nm), 'Migration snapshot: ' + nm)
 for k, (f, n, t) in enumerate(appli):
     flow(sid(f), 'appli_%d' % k, n)
     flow('appli_%d' % k, sid(t))
@@ -170,7 +184,7 @@ W, H = 180, 80          # task shape size
 SW, SH = 36, 36         # event shape size
 PER_ROW = 6             # layers per band
 SLOT_W, SLOT_H = 250, 112
-allnodes = ['start'] + [sid(nm) for nm in names] + ['appli_%d' % k for k in range(len(appli))] + ['end']
+allnodes = ['start', 'snapshot'] + [sid(nm) for nm in names] + ['appli_%d' % k for k in range(len(appli))] + ['end']
 adj = {}
 for _f, a, b in flows:
     if a != b:
