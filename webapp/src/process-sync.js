@@ -59,16 +59,21 @@ function createTools({flowableApi, planeApi, CFG, log, ocrProjectId, stateAlias,
     return serial(String(wi.id), async () => {
       const a = body.activity || {};
       if (!['state','state_id'].includes(a.field)) return {skipped:'not a state change'};
-      // The installed Plane model_activity webhook sends UUID values with null identifiers.
+      // Plane model_activity payloads vary: sometimes UUID identifiers, sometimes values only.
       const uuid = x => typeof x === 'string' && /^[a-f0-9-]{36}$/i.test(x);
-      const oldId = a.old_identifier || (uuid(a.old_value) ? a.old_value : null);
-      const newId = a.new_identifier || (uuid(a.new_value) ? a.new_value : null);
-      if (!oldId || !newId || String(oldId) === String(newId)) return {skipped:'state change identifiers missing or unchanged'};
+      let oldId = a.old_identifier || (uuid(a.old_value) ? a.old_value : null);
+      let newId = a.new_identifier || (uuid(a.new_value) ? a.new_value : null);
       const project = typeof wi.project === 'object' ? wi.project.id : wi.project_id || wi.project;
       const expectedProject = ocrProjectId ? await ocrProjectId() : CFG.planeCreditProject;
       if (String(project) !== String(expectedProject)) return {skipped:'other project'};
       const item = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${project}/work-items/${wi.id}/`);
       const current = typeof item.state === 'object' ? item.state.id : item.state_id || item.state;
+      if (!newId) newId = current || null;
+      if (!oldId) {
+        const insts0 = await matches(wi.id);
+        oldId = insts0.length === 1 ? (variables(insts0[0].variables).stateId || null) : null;
+      }
+      if (!oldId || !newId || String(oldId) === String(newId)) return {skipped:'state change identifiers missing or unchanged'};
       if (String(current) !== String(newId)) return {skipped:'stale event: Plane has a different current state'};
       const instances = await matches(wi.id);
       if (instances.length === 0 && startCase) {
