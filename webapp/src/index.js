@@ -220,7 +220,17 @@ function routeMocks(pathname, method, body, u, res) {
 
 /* ---------------- Plane webhook handling ---------------- */
 const { pages: flowablePages, variables: normalizeVariables, graph: parseProcessGraph, createTools } = require('./process-sync');
-const processTools = createTools({ flowableApi, planeApi, CFG, log });
+const STATE_TASK_ALIAS = {
+  'Recu en agence': 'Demande Reçue',
+  'Réception': 'Demande Reçue',
+  'Étude': 'Demande en étude',
+  'Garanties': 'Garanties à recueillir',
+  'Assurance AXA': 'Attente AXA',
+  'Décision': 'Attente décision',
+  'Décaissement': 'Dossier à décaisser',
+  'Clôture': 'Dossier soldé',
+};
+const processTools = createTools({ flowableApi, planeApi, CFG, log, ocrProjectId: (...a) => ocrProjectId(...a), stateAlias: n => STATE_TASK_ALIAS[n] || n });
 const INSPECTOR_URL = ENV.INSPECTOR_PUBLIC_URL || 'https://sga.andersenlab.com/inspector';
 function escapeHtml(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 async function appendInspectorLink(wi, project) {
@@ -273,7 +283,8 @@ async function handleWebhook(bodyBuf, signature) {
     const stateId = typeof item.state === 'object' ? item.state.id : item.state_id || item.state;
     const sp = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${proj}/states/`);
     const state = (Array.isArray(sp) ? sp : sp.results || []).find(s => s.id === stateId);
-    const ts = g.tasks.filter(t => state && t.name === state.name);
+    const aliasName = state && (STATE_TASK_ALIAS[state.name] || state.name);
+    const ts = g.tasks.filter(t => state && t.name === aliasName);
     if (ts.length !== 1) return { skipped: 'current Plane state has no exact workflow task' };
     const ci = await flowableApi('POST', '/service/runtime/process-instances', {processDefinitionId:defs[0].id, businessKey:String(wi.id), variables:[{name:'dossierId',value:String(wi.id)},{name:'dossierName',value:String(item.name || '')},{name:'stateId',value:String(stateId)},{name:'initialTask',value:ts[0].id},{name:'selectedFlowId',value:''},{name:'migrationSnapshot',value:true}]});
     log('flowable dossier snapshot started', wi.id, ci.id);

@@ -24,7 +24,8 @@ function transitions(g, source, targetName) {
   if (target.length !== 1) return [];
   return g.flows.filter(f => f.sourceRef === source).filter(f => f.targetRef === target[0].id || (f.targetRef.startsWith('appli_') && g.flows.some(a => a.sourceRef === f.targetRef && a.targetRef === target[0].id)));
 }
-function createTools({flowableApi, planeApi, CFG, log}) {
+function createTools({flowableApi, planeApi, CFG, log, ocrProjectId, stateAlias}) {
+  const alias = stateAlias || (n => n);
   const queues = new Map();
   async function serial(key, fn) {
     const prior = queues.get(key) || Promise.resolve();
@@ -63,7 +64,8 @@ function createTools({flowableApi, planeApi, CFG, log}) {
       const newId = a.new_identifier || (uuid(a.new_value) ? a.new_value : null);
       if (!oldId || !newId || String(oldId) === String(newId)) return {skipped:'state change identifiers missing or unchanged'};
       const project = typeof wi.project === 'object' ? wi.project.id : wi.project_id || wi.project;
-      if (String(project) !== CFG.planeCreditProject) return {skipped:'other project'};
+      const expectedProject = CFG.planeCreditProject || (ocrProjectId ? await ocrProjectId() : '');
+      if (String(project) !== String(expectedProject)) return {skipped:'other project'};
       const item = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${project}/work-items/${wi.id}/`);
       const current = typeof item.state === 'object' ? item.state.id : item.state_id || item.state;
       if (String(current) !== String(newId)) return {skipped:'stale event: Plane has a different current state'};
@@ -81,16 +83,54 @@ function createTools({flowableApi, planeApi, CFG, log}) {
       if (tasks.length !== 1) return {skipped:'ambiguous active tasks', count:tasks.length};
       const task = tasks[0]; const source = g.tasks.find(t => t.id === task.taskDefinitionKey);
       const sourceState = (Array.isArray(states) ? states : states.results || []).find(s => String(s.id) === String(oldId));
-      if (!source || !sourceState || source.name !== sourceState.name) return {skipped:'active task does not match source state'};
-      const choices = transitions(g, task.taskDefinitionKey, target.name);
-      if (choices.length !== 1) return {skipped:'transition absent or ambiguous; explicit Jira action required', choices:choices.map(f => f.name)};
+      if (!source || !sourceState || (source.name !== sourceState.name && source.name !== alias(sourceState.name))) return {skipped:'active task does not match source state'};
+      const targetName = alias(target.name);
       const eventKey = cryptoHash([wi.id,oldId,newId,task.id].join(':'));
-      await flowableApi('POST', '/service/runtime/tasks/' + encodeURIComponent(task.id), {action:'complete', variables:[{name:'selectedFlowId',value:choices[0].id},{name:'stateId',value:String(newId)},{name:'lastPlaneEvent',value:eventKey},{name:'lastPlaneTransition',value:choices[0].name || choices[0].id}]});
-      log('dossier synchronized', wi.id, 'instance', inst.id, 'task', task.id, 'flow', choices[0].id);
-      return {ok:true, instanceId:inst.id, completedTaskId:task.id, selectedFlowId:choices[0].id};
+      let cur = task; const hops = [];
+      while (true) {
+        const curInfo = g.tasks.find(t => t.id === cur.taskDefinitionKey);
+        if (curInfo && curInfo.name === targetName) {
+          if (String(v.stateId) !== String(newId)) { try { await flowableApi('PUT', '/service/runtime/process-instances/' + encodeURIComponent(inst.id) + '/variables/stateId', {value:String(newId)}); } catch (e) {} }
+          log('dossier synchronized', wi.id, 'instance', inst.id, 'hops', hops.length);
+          return {ok:true, instanceId:inst.id, completedTasks:hops};
+        }
+        let choices = transitions(g, cur.taskDefinitionKey, targetName);
+        if (choices.length !== 1) {
+          const path = bfsTaskPath(g, cur.taskDefinitionKey, targetName);
+          if (!path || path.length < 2) return {skipped:'transition absent or ambiguous; explicit Jira action required', from:curInfo && curInfo.name, to:targetName};
+          choices = transitions(g, cur.taskDefinitionKey, path[1]);
+          if (choices.length !== 1) return {skipped:'multi-hop path blocked at ' + path[1]};
+        }
+        const flow = choices[0];
+        await flowableApi('POST', '/service/runtime/tasks/' + encodeURIComponent(cur.id), {action:'complete', variables:[{name:'selectedFlowId',value:flow.id},{name:'stateId',value:String(newId)},{name:'lastPlaneEvent',value:eventKey},{name:'lastPlaneTransition',value:flow.name || flow.id}]});
+        hops.push(flow.name || flow.id);
+        if (hops.length > 8) return {skipped:'advance exceeded 8 hops; stopped to avoid runaway'};
+        const nextTasks = await pages(flowableApi, '/service/runtime/tasks?processInstanceId=' + encodeURIComponent(inst.id));
+        if (nextTasks.length !== 1) break;
+        cur = nextTasks[0];
+      }
+      log('dossier synchronized (engine parked or ended)', wi.id, 'instance', inst.id, 'hops', hops.length);
+      return {ok:true, instanceId:inst.id, completedTasks:hops};
     });
   }
   return {matches, model, inspect, update, serial};
 }
 function cryptoHash(s) {return require('crypto').createHash('sha256').update(s).digest('hex');}
-module.exports = {variables,pages,graph,transitions,createTools};
+function bfsTaskPath(g, sourceId, targetName) {
+  const target = g.tasks.filter(t => t.name === targetName);
+  if (target.length !== 1) return null;
+  const bySource = {};
+  for (const f of g.flows) (bySource[f.sourceRef] = bySource[f.sourceRef] || []).push(f);
+  const step = ref => { if (!String(ref).startsWith('appli_')) return [ref]; const inner = (bySource[ref] || []).map(x => x.targetRef); return inner.length === 1 ? [inner[0]] : []; };
+  const prev = new Map(); const q = [sourceId]; const seen = new Set([sourceId]);
+  while (q.length) {
+    const curId = q.shift();
+    for (const f of (bySource[curId] || [])) for (const nxt of step(f.targetRef)) {
+      if (seen.has(nxt)) continue; seen.add(nxt); prev.set(nxt, curId);
+      if (nxt === target[0].id) { const ids = [nxt]; let p = curId; while (p !== sourceId && prev.get(p)) { ids.unshift(p); p = prev.get(p); } ids.unshift(sourceId); return ids.map(id => (g.tasks.find(t => t.id === id) || {}).name).filter(Boolean); }
+      q.push(nxt);
+    }
+  }
+  return null;
+}
+module.exports = {variables,pages,graph,transitions,bfsTaskPath,createTools};
