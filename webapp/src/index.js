@@ -45,6 +45,7 @@ const CFG = {
   agentToken: ENV.AGENT_TOKEN || '',
 };
 
+async function ocrPidOrThrow(){ const p2 = await ocrProjectId(); if (!p2) throw new Error('no OCR project - run migration first (it creates the project)'); return p2; }
 /* ---------------- dynamic OCR project resolution (project is CREATED by migration) ---------------- */
 let OCR_PID = null;
 async function ocrProjectId() {
@@ -878,7 +879,7 @@ const server = http.createServer(async (req, res) => {
       if (bulk) { try { const prE = await ensureOcrProject(); if (prE.created) log('projet OCR cree (migration step 0): ' + prE.pid); } catch (ePr) { return json(res, 502, { error: 'project create: ' + ePr.message.slice(0, 160) }); } }
       if (bulk && id !== 'jira-import') { try { await new Promise(r2 => setTimeout(r2, 4000)); await ensureOcrProject(); } catch (eW2) { } }
       try {
-        const out = await agentRun(id);
+        const out = await agentRun(id, bulk ? 1500000 : undefined);
         if (out && out.exit === 0 && ['workflow-migrate', 'jira-dry', 'jira-import', 'jira-import-wipe', 'jira-import-phases'].indexOf(id) !== -1) MIGRATED = true;
         return json(res, 200, out);
       } catch (e) { return json(res, 502, { error: e.message.slice(0, 160) }); } finally { if (bulk) setTimeout(function () { SUPPRESS_WEBHOOK = false; log('fenetre de suppression webhook fermee (90s)'); }, 90000); }
