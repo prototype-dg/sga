@@ -56,7 +56,7 @@ async function ocrProjectId() {
   } catch (e) { }
   return null;
 }
-function ocrProjectSync() { return OCR_PID || await ocrProjectId() || ''; }
+function ocrProjectSync() { return OCR_PID || CFG.planeCreditProject || ''; }
 
 /* ---------------- tiny helpers ---------------- */
 function log(...a) {
@@ -574,11 +574,10 @@ async function ensureOcrProject() {
 async function runMigrationJob() {
   migJob.running = true; migJob.phase = 'creation du projet OCR dans Plane'; migJob.errors = [];
   SUPPRESS_WEBHOOK = true;
+  SUPPRESS_WEBHOOK = true;
   try {
     const pr = await ensureOcrProject();
     migJob.phase = 'non-destructive workflow and Jira alignment';
-  SUPPRESS_WEBHOOK = true;
-  try {
     const out = await agentRun('jira-import');
     if (!out || out.exit !== 0) throw new Error('agent migration failed');
     MIGRATED = true; migJob.result = out; migJob.phase = 'done';
