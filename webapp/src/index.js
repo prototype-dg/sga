@@ -287,7 +287,13 @@ async function ingestDossier(body) {
   const client = body.client || {};
   const nom = client.nom || body.client || 'Client anonyme';
   const type = (body.type || body.produit || 'CONSO').toUpperCase();
+  let stRecuId = null;
+  try {
+    const stList = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${projectId}/states/`);
+    stRecuId = ((stList.results || []).find(st => st.name === 'Recu en agence') || {}).id || null;
+  } catch (e) { log('ingest state lookup warn', e.message.slice(0, 100)); }
   const wi = await planeCreateWorkItem(projectId, {
+    ...(stRecuId ? { state: stRecuId } : {}),
     name: `Dossier ${nom}`,
     description_html: `<p>Demande de crédit reçue depuis l'application mobile (mock).</p><ul><li>Client : <b>${nom}</b></li><li>Téléphone : ${client.telephone || body.telephone || '—'}</li><li>Produit : ${type}</li><li>Montant : ${body.montant} DZD</li><li>Durée : ${body.duree || '—'} mois</li><li>Agence : ${body.agence || '—'}</li></ul>`,
     work_item_type: 'dossier-credit',
