@@ -96,10 +96,9 @@ function createTools({flowableApi, planeApi, CFG, log, ocrProjectId, stateAlias}
         }
         let choices = transitions(g, cur.taskDefinitionKey, targetName);
         if (choices.length !== 1) {
-          const path = bfsTaskPath(g, cur.taskDefinitionKey, targetName);
-          if (!path || path.length < 2) return {skipped:'transition absent or ambiguous; explicit Jira action required', from:curInfo && curInfo.name, to:targetName};
-          choices = transitions(g, cur.taskDefinitionKey, path[1]);
-          if (choices.length !== 1) return {skipped:'multi-hop path blocked at ' + path[1]};
+          const fl = bfsFlowPath(g, cur.taskDefinitionKey, targetName);
+          if (!fl || !fl.length) return {skipped:'transition absent or ambiguous; explicit Jira action required', from:curInfo && curInfo.name, to:targetName};
+          choices = [{id: fl[0], name: fl[0]}];
         }
         const flow = choices[0];
         await flowableApi('POST', '/service/runtime/tasks/' + encodeURIComponent(cur.id), {action:'complete', variables:[{name:'selectedFlowId',value:flow.id},{name:'stateId',value:String(newId)},{name:'lastPlaneEvent',value:eventKey},{name:'lastPlaneTransition',value:flow.name || flow.id}]});
@@ -116,21 +115,34 @@ function createTools({flowableApi, planeApi, CFG, log, ocrProjectId, stateAlias}
   return {matches, model, inspect, update, serial};
 }
 function cryptoHash(s) {return require('crypto').createHash('sha256').update(s).digest('hex');}
-function bfsTaskPath(g, sourceId, targetName) {
+function bfsFlowPath(g, sourceId, targetName) {
   const target = g.tasks.filter(t => t.name === targetName);
   if (target.length !== 1) return null;
+  const tid = target[0].id;
+  const isTask = id => g.tasks.some(t => t.id === id);
   const bySource = {};
   for (const f of g.flows) (bySource[f.sourceRef] = bySource[f.sourceRef] || []).push(f);
-  const step = ref => { if (!String(ref).startsWith('appli_')) return [ref]; const inner = (bySource[ref] || []).map(x => x.targetRef); return inner.length === 1 ? [inner[0]] : []; };
-  const prev = new Map(); const q = [sourceId]; const seen = new Set([sourceId]);
+  const q = [[sourceId, []]]; const seen = new Set([sourceId]);
   while (q.length) {
-    const curId = q.shift();
-    for (const f of (bySource[curId] || [])) for (const nxt of step(f.targetRef)) {
-      if (seen.has(nxt)) continue; seen.add(nxt); prev.set(nxt, curId);
-      if (nxt === target[0].id) { const ids = [nxt]; let p = curId; while (p !== sourceId && prev.get(p)) { ids.unshift(p); p = prev.get(p); } ids.unshift(sourceId); return ids.map(id => (g.tasks.find(t => t.id === id) || {}).name).filter(Boolean); }
-      q.push(nxt);
+    const pair = q.shift(); const node = pair[0]; const flows = pair[1];
+    for (const f of (bySource[node] || [])) {
+      const fl = flows.concat([f.id]);
+      let cur = f.targetRef; let guard = 0;
+      while (cur !== tid && guard++ < 8) {
+        if (String(cur).startsWith('appli_')) {
+          const inner = bySource[cur] || [];
+          if (inner.length !== 1) { cur = null; break; }
+          cur = inner[0].targetRef;
+        } else if (!isTask(cur)) {
+          const out = bySource[cur] || [];
+          if (out.length !== 1) { cur = null; break; }
+          cur = out[0].targetRef;
+        } else break;
+      }
+      if (cur === tid) return fl;
+      if (cur && isTask(cur) && !seen.has(cur)) { seen.add(cur); q.push([cur, fl]); }
     }
   }
   return null;
 }
-module.exports = {variables,pages,graph,transitions,bfsTaskPath,createTools};
+module.exports = {variables,pages,graph,transitions,bfsFlowPath,createTools};
