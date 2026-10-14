@@ -869,6 +869,7 @@ const server = http.createServer(async (req, res) => {
       if (!id) return json(res, 400, { error: 'missing id' });
       const bulk = (id === 'jira-import' || id === 'jira-import-wipe' || id === 'jira-import-phases');
       if (bulk) SUPPRESS_WEBHOOK = true;
+      if (bulk) { try { const prE = await ensureOcrProject(); if (prE.created) log('projet OCR cree (migration step 0): ' + prE.pid); } catch (ePr) { return json(res, 502, { error: 'project create: ' + ePr.message.slice(0, 160) }); } }
       try {
         const out = await agentRun(id);
         if (out && out.exit === 0 && ['workflow-migrate', 'jira-dry', 'jira-import', 'jira-import-wipe', 'jira-import-phases'].indexOf(id) !== -1) MIGRATED = true;
