@@ -855,6 +855,7 @@ const server = http.createServer(async (req, res) => {
       const dossier = u.searchParams.get('dossier'); const instanceId = u.searchParams.get('instance');
       if (dossier || instanceId) {
         bootstrap = {};
+        try {
         if (dossier && /^[a-f0-9-]{36}$/i.test(dossier)) {
           const item = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${await ocrProjectId()}/work-items/${dossier}/`);
           const sp = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${await ocrProjectId()}/states/`);
@@ -866,6 +867,7 @@ const server = http.createServer(async (req, res) => {
           if (chosen) bootstrap.instance = await processTools.inspect(chosen.id);
         } else if (!dossier && instanceId) bootstrap.instance = await processTools.inspect(instanceId);
         if (bootstrap.instance) bootstrap.model = await processTools.model(bootstrap.instance.processDefinitionId);
+        } catch (eBoot) { log('inspector bootstrap warn', String(eBoot && eBoot.message).slice(0, 120)); bootstrap.error = 'Dossier introuvable ou réinitialisé — choisissez un dossier dans la liste.'; }
       }
       return html(res, 200, inspectorPage(bootstrap));
     }
