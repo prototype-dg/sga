@@ -154,9 +154,37 @@ class Command(BaseCommand):
                 url=opts['inspector_url']+'?dossier='+str(item.id)
                 Issue.objects.filter(id=item.id).update(description_html=item.description_html+'<p><a href="'+html.escape(url,quote=True)+'" target="_blank" rel="noopener">Process Inspector — étape courante de ce dossier</a></p>')
                 created+=1; linked+=1
-        # post-step: remap every ticket to its Jira BOARD COLUMN state (Jira-like Kanban)
+        # post-step: remap every ticket to its Jira BOARD COLUMN state (Jira-like Kanban) - INLINE, loud errors
         try:
-            exec(open('/code/plane/db/management/commands/_column_remap.py').read())
-        except Exception as _e:
-            self.stdout.write('column remap warn: %s' % _e)
+            _cfgb = self.jira('/rest/agile/1.0/board/%d/configuration' % opts['board'])
+            _allst = self.jira('/rest/api/2/status?maxResults=100')
+            _sid2name = {str(_x['id']): _x['name'] for _x in _allst}
+            _s2c = {}
+            for _col in _cfgb['columnConfig']['columns']:
+                for _st in _col.get('statuses', []):
+                    _n = _sid2name.get(str(_st['id']))
+                    if _n: _s2c[_n] = _col['name']
+            _BOARD = ['R\u00e9ception', '\u00c9tude', 'Garanties', 'Assurance AXA', 'D\u00e9cision', 'D\u00e9caissement', 'Cl\u00f4ture', 'Recu en agence']
+            _COLORS = {'R\u00e9ception': '#94a3b8', '\u00c9tude': '#f59e0b', 'Garanties': '#8b5cf6', 'Assurance AXA': '#06b6d4', 'D\u00e9cision': '#ef4444', 'D\u00e9caissement': '#10b981', 'Cl\u00f4ture': '#6b7280', 'Recu en agence': '#3b82f6'}
+            _GROUP = {'R\u00e9ception': 'backlog', 'Recu en agence': 'backlog', 'Cl\u00f4ture': 'completed'}
+            _sf = {f.attname for f in State._meta.fields}
+            _created = 0
+            for _b in _BOARD:
+                if not State.objects.filter(project_id=proj.id, name=_b, deleted_at__isnull=True).exists():
+                    _kw = {k: v for k, v in dict(name=_b, group=_GROUP.get(_b, 'started'), color=_COLORS.get(_b, '#3f76ff'), project_id=proj.id, workspace_id=proj.workspace_id).items() if k in _sf}
+                    State.objects.create(**_kw); _created += 1
+            _states = {s.name: s for s in State.objects.filter(project_id=proj.id, deleted_at__isnull=True)}
+            _remapped = 0
+            for _i in Issue.objects.filter(project_id=proj.id).select_related('state'):
+                _c = _s2c.get(_i.state.name if _i.state else None)
+                if _c and _c in _states and _states[_c].id != _i.state_id:
+                    _i.state = _states[_c]; _i.save(update_fields=['state']); _remapped += 1
+            _deleted = 0
+            for _s2 in list(State.objects.filter(project_id=proj.id)):
+                if _s2.name not in _BOARD and not Issue.objects.filter(state=_s2).exists():
+                    _s2.delete(); _deleted += 1
+            _dist = {s2.name: Issue.objects.filter(state=s2).count() for s2 in State.objects.filter(project_id=proj.id, deleted_at__isnull=True)}
+            self.stdout.write('COLUMN-REMAP ok: created=%d remapped=%d deleted=%d left=%d dist=%s' % (_created, _remapped, _deleted, len(_dist), json.dumps(_dist, ensure_ascii=False)))
+        except Exception as _re:
+            self.stdout.write('COLUMN-REMAP ERROR: %s' % repr(_re)[:220])
         self.stdout.write(json.dumps({'alignedStatuses':count,'appendedLinks':linked,'createdIssues':created,'preservedIssues':skipped,'extraStatesPreserved':State.objects.filter(project=proj).exclude(id__in=[s.id for s in state_map.values()]).count()},ensure_ascii=False))
