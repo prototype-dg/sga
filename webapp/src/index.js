@@ -149,8 +149,8 @@ async function flowableStartProcess(defKey, vars) {
 }
 let DEMO_DATASET = null;
 try { DEMO_DATASET = JSON.parse(fs.readFileSync(path.join(__dirname, 'assets', 'demo-dataset.json'), 'utf8')); log('demo dataset loaded:', (DEMO_DATASET.records || []).length, 'records'); } catch (e) { log('demo dataset NOT loaded:', e.message.slice(0, 100)); }
-async function agentRun(id) {
-  const r = await fetch(CFG.agentUrl + '/run', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Agent-Token': CFG.agentToken }, body: JSON.stringify({ id }) });
+async function agentRun(id, timeoutMs) {
+  const r = await fetch(CFG.agentUrl + '/run', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Agent-Token': CFG.agentToken }, body: JSON.stringify({ id }), signal: AbortSignal.timeout(timeoutMs || 300000) });
   return r.json();
 }
 
@@ -254,7 +254,9 @@ async function handleWebhook(bodyBuf, signature) {
   if (SUPPRESS_WEBHOOK) { log('webhook supprime (reset/import en cours)', ev); return { skipped: 'suppressed during reset/import' }; }
   const wi = findWorkItem(body, 0);
   if (!wi) { log('webhook skip: aucun work item dans le payload (keys=' + Object.keys(body).join(',') + ')'); return { skipped: 'no work item in payload' }; }
-  const proj = wi.project_id || (wi.project && (wi.project.id || wi.project)) || null;
+  let proj = wi.project_id || (wi.project && (wi.project.id || wi.project)) || null;
+  if (!proj || String(proj) === 'null') proj = await ocrProjectId();
+  if (!proj) { log('ingest refuse: projet OCR absent (lancez la migration)'); return { error: 'no OCR project - run migration first' }; }
   if (!wi.id) { log('webhook skip: work item partiel (data=' + JSON.stringify(Object.keys(body.data || {})) + ')'); return { skipped: 'no work item in payload' }; }
   log('webhook work item', String(wi.name || wi.id), 'projet', String(proj || '?'));
   if (String(proj) !== String(await ocrProjectId())) { log('webhook skip: autre projet', String(proj)); return { skipped: 'other project' }; }
@@ -534,10 +536,14 @@ async function runResetJob() {
     } catch (e) { flowPart.errors.push('agent unreachable: ' + e.message.slice(0, 100)); }
     if (!flowPart.deletedProcesses && !flowPart.defsDeleted) flowPart = await resetFlowableOnly();
     const planeSeeded = 0; // Plane stays EMPTY before migration (states/columns are kept) - demo narrative
-    resetJob.phase = 'wiping Jira';
-    const jdel = CFG.jiraPass ? await jiraWipeIssues() : 0;
-    resetJob.phase = 're-seeding Jira dataset';
-    const seeded = CFG.jiraPass ? await jiraSeedDataset(resetJob) : 0;
+    resetJob.phase = 'wiping + re-seeding Jira (VM-side, crash-safe)';
+    let jdel = 0, seeded = 0;
+    if (CFG.jiraPass) {
+      const sr = await agentRun('jira-seed', 1500000);
+      if (!sr || sr.exit !== 0) resetJob.errors.push('jira-seed failed: ' + String(sr && (sr.stderr || sr.error)).slice(0, 140));
+      const m = String(sr && sr.stdout || '').match(/SEED-WIPE-DELETED: (\d+)/); jdel = m ? +m[1] : 0;
+      const m2 = String(sr && sr.stdout || '').match(/SEED-DONE ok=(\d+)/); seeded = m2 ? +m2[1] : 0;
+    }
     resetJob.phase = 'removing OCR project (pre-migration: Plane is empty)';
     try {
       await planeApi('DELETE', '/api/v1/workspaces/sga/projects/' + await ocrProjectId() + '/');
@@ -870,6 +876,7 @@ const server = http.createServer(async (req, res) => {
       const bulk = (id === 'jira-import' || id === 'jira-import-wipe' || id === 'jira-import-phases');
       if (bulk) SUPPRESS_WEBHOOK = true;
       if (bulk) { try { const prE = await ensureOcrProject(); if (prE.created) log('projet OCR cree (migration step 0): ' + prE.pid); } catch (ePr) { return json(res, 502, { error: 'project create: ' + ePr.message.slice(0, 160) }); } }
+      if (bulk && id !== 'jira-import') { try { await new Promise(r2 => setTimeout(r2, 4000)); await ensureOcrProject(); } catch (eW2) { } }
       try {
         const out = await agentRun(id);
         if (out && out.exit === 0 && ['workflow-migrate', 'jira-dry', 'jira-import', 'jira-import-wipe', 'jira-import-phases'].indexOf(id) !== -1) MIGRATED = true;
