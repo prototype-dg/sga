@@ -241,7 +241,7 @@ const STATE_TASK_ALIAS = {
   'Décaissement': 'Dossier à décaisser',
   'Clôture': 'Dossier soldé',
 };
-const processTools = createTools({ flowableApi, planeApi, CFG, log, ocrProjectId: (...a) => ocrProjectId(...a), stateAlias: n => STATE_TASK_ALIAS[n] || n, startCase: (it, pr, st) => startDossierCase(it, pr, st) });
+const processTools = createTools({ flowableApi, planeApi, CFG, log, ocrProjectId: (...a) => ocrProjectId(...a), stateAlias: n => STATE_TASK_ALIAS[n] || n, startCase: (it, pr, st) => startDossierCase(it, pr, st), jrec: e => jrec(e) });
 const INSPECTOR_URL = ENV.INSPECTOR_PUBLIC_URL || 'https://sga.andersenlab.com/inspector';
 function escapeHtml(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 async function appendInspectorLink(wi, project) {
@@ -469,7 +469,7 @@ var requestedInstance=new URLSearchParams(location.search).get('instance');
 var loadedDefinition=null, loadGeneration=0;
 function safe(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function checked(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
-function fetchJournal(){if(!requestedDossier||window._journalFor===requestedDossier)return;fetch('/inspector/api/journal/'+encodeURIComponent(requestedDossier)).then(function(r){return r.ok?r.json():{entries:[]}}).then(function(d){window._journal=(d.entries||[]);window._journalFor=requestedDossier}).catch(function(){window._journal=[]})}
+function fetchJournal(){if(!requestedDossier||window._journalFor===requestedDossier)return;fetch('/inspector/api/journal/'+encodeURIComponent(requestedDossier)).then(function(r){return r.ok?r.json():{entries:[]}}).then(function(d){window._journal=(d.entries||[]);window._journalFor=requestedDossier;if(window._lastDetail)showTaskDetail(window._lastDetail[0],window._lastDetail[1],window._lastDetail[2])}).catch(function(){window._journal=[]})}
 var KB={
 "Création dossier (APPLI)":{t:"Auto",ess:"Credit case created from the mobile application; the Flowable engine instantiates the OCP workflow.",sys:"Core banking app + workflow engine"},
 "État initial observé":{t:"Gateway",ess:"Routing gateway: picks the entry point that matches the dossier's current Plane state (migration snapshot)."},
@@ -522,6 +522,7 @@ var KB={
 "[APPLI] - Test TNR APPLI":{t:"Auto",sys:"Application regression test",ess:"Application non-regression test step."}
 };
 function showTaskDetail(activityId, name, isCurrent) {
+  window._lastDetail = [activityId, name, isCurrent];
   var rows = (window._activities || []).filter(function(a){return a.activityId === activityId});
   var a = rows.length ? rows[rows.length - 1] : null;
   var kb = (name && KB[name]) || {t: rows.length && rows[0].type === 'serviceTask' ? 'Auto' : 'Manual', ess: 'No description for this step.'};

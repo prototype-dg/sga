@@ -24,7 +24,7 @@ function transitions(g, source, targetName) {
   if (target.length !== 1) return [];
   return g.flows.filter(f => f.sourceRef === source).filter(f => f.targetRef === target[0].id || (f.targetRef.startsWith('appli_') && g.flows.some(a => a.sourceRef === f.targetRef && a.targetRef === target[0].id)));
 }
-function createTools({flowableApi, planeApi, CFG, log, ocrProjectId, stateAlias, startCase}) {
+function createTools({flowableApi, planeApi, CFG, log, ocrProjectId, stateAlias, startCase, jrec}) {
   const alias = stateAlias || (n => n);
   const queues = new Map();
   async function serial(key, fn) {
@@ -114,7 +114,9 @@ function createTools({flowableApi, planeApi, CFG, log, ocrProjectId, stateAlias,
           choices = [{id: fl[0], name: fl[0]}];
         }
         const flow = choices[0];
-        await flowableApi('POST', '/service/runtime/tasks/' + encodeURIComponent(cur.id), {action:'complete', variables:[{name:'selectedFlowId',value:flow.id},{name:'stateId',value:String(newId)},{name:'lastPlaneEvent',value:eventKey},{name:'lastPlaneTransition',value:flow.name || flow.id}]});
+        const cUrl = '/service/runtime/tasks/' + encodeURIComponent(cur.id);
+        await flowableApi('POST', cUrl, {action:'complete', variables:[{name:'selectedFlowId',value:flow.id},{name:'stateId',value:String(newId)},{name:'lastPlaneEvent',value:eventKey},{name:'lastPlaneTransition',value:flow.name || flow.id}]});
+        if (jrec) jrec({kind:'flowable', method:'POST', url:cUrl, req:JSON.stringify({action:'complete', selectedFlowId:flow.id, transition:flow.name || flow.id, engineTask:cur.taskDefinitionKey}).slice(0,900), status:200, res:'task completed by engine', d:String(wi.id)});
         hops.push(flow.name || flow.id);
         if (hops.length > 8) return {skipped:'advance exceeded 8 hops; stopped to avoid runaway'};
         const nextTasks = await pages(flowableApi, '/service/runtime/tasks?processInstanceId=' + encodeURIComponent(inst.id));
