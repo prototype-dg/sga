@@ -230,7 +230,7 @@ const STATE_TASK_ALIAS = {
   'Décaissement': 'Dossier à décaisser',
   'Clôture': 'Dossier soldé',
 };
-const processTools = createTools({ flowableApi, planeApi, CFG, log, ocrProjectId: (...a) => ocrProjectId(...a), stateAlias: n => STATE_TASK_ALIAS[n] || n });
+const processTools = createTools({ flowableApi, planeApi, CFG, log, ocrProjectId: (...a) => ocrProjectId(...a), stateAlias: n => STATE_TASK_ALIAS[n] || n, startCase: (it, pr, st) => startDossierCase(it, pr, st) });
 const INSPECTOR_URL = ENV.INSPECTOR_PUBLIC_URL || 'https://sga.andersenlab.com/inspector';
 function escapeHtml(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 async function appendInspectorLink(wi, project) {
@@ -276,20 +276,24 @@ async function handleWebhook(bodyBuf, signature) {
     await appendInspectorLink(item, proj);
     const existing = await processTools.matches(wi.id, true);
     if (existing.length) return { skipped: 'dossier already has process history', instanceIds: existing.map(p => p.id) };
-    const defs = await flowablePages(flowableApi, '/service/repository/process-definitions?key=OCP_case&latest=true');
-    if (defs.length !== 1) return { skipped: 'no unique workflow definition' };
-    const g = parseProcessGraph(await processTools.model(defs[0].id));
-    if (!g.safe) return { skipped: 'legacy unguarded workflow; creation refused' };
-    const stateId = typeof item.state === 'object' ? item.state.id : item.state_id || item.state;
-    const sp = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${proj}/states/`);
-    const state = (Array.isArray(sp) ? sp : sp.results || []).find(s => s.id === stateId);
-    const aliasName = state && (STATE_TASK_ALIAS[state.name] || state.name);
-    const ts = g.tasks.filter(t => state && t.name === aliasName);
-    if (ts.length !== 1) return { skipped: 'current Plane state has no exact workflow task' };
-    const ci = await flowableApi('POST', '/service/runtime/process-instances', {processDefinitionId:defs[0].id, businessKey:String(wi.id), variables:[{name:'dossierId',value:String(wi.id)},{name:'dossierName',value:String(item.name || '')},{name:'stateId',value:String(stateId)},{name:'initialTask',value:ts[0].id},{name:'selectedFlowId',value:''},{name:'migrationSnapshot',value:true}]});
-    log('flowable dossier snapshot started', wi.id, ci.id);
-    return {ok:true, caseId:ci.id};
+    return startDossierCase(item, proj);
   });
+}
+async function startDossierCase(item, proj, stateIdOverride) {
+  const defs = await flowablePages(flowableApi, '/service/repository/process-definitions?key=OCP_case&latest=true');
+  if (defs.length !== 1) return { skipped: 'no unique workflow definition' };
+  const g = parseProcessGraph(await processTools.model(defs[0].id));
+  if (!g.safe) return { skipped: 'legacy unguarded workflow; creation refused' };
+  const stateId = stateIdOverride || (typeof item.state === 'object' ? item.state.id : item.state_id || item.state);
+  const sp = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${proj}/states/`);
+  const state = (Array.isArray(sp) ? sp : sp.results || []).find(s => s.id === stateId);
+  const aliasName = state && (STATE_TASK_ALIAS[state.name] || state.name);
+  const ts = g.tasks.filter(t => state && t.name === aliasName);
+  if (ts.length !== 1) return { skipped: 'current Plane state has no exact workflow task' };
+  const ci = await flowableApi('POST', '/service/runtime/process-instances', {processDefinitionId:defs[0].id, businessKey:String(item.id), variables:[{name:'dossierId',value:String(item.id)},{name:'dossierName',value:String(item.name || '')},{name:'stateId',value:String(stateId)},{name:'initialTask',value:ts[0].id},{name:'selectedFlowId',value:''},{name:'migrationSnapshot',value:true}]});
+  log('flowable dossier snapshot started', item.id, ci.id);
+  try { await appendInspectorLink(item, proj); } catch (eL) { log('inspector link warn', eL.message.slice(0, 80)); }
+  return {ok:true, caseId:ci.id};
 }
 
 /* ---------------- REST ingestion (mobile app / API) ---------------- */
@@ -555,6 +559,12 @@ async function runResetJob() {
       else flowPart.errors.push('agent flowable-clean failed: ' + String(r && r.stderr).slice(0, 120));
     } catch (e) { flowPart.errors.push('agent unreachable: ' + e.message.slice(0, 100)); }
     if (!flowPart.deletedProcesses && !flowPart.defsDeleted) flowPart = await resetFlowableOnly();
+    try {
+      const hist = await flowablePages(flowableApi, '/service/history/historic-process-instances?size=100');
+      let histDel = 0;
+      for (const h of hist) { try { await flowableApi('DELETE', '/service/history/historic-process-instances/' + h.id); histDel++; } catch (eH) {} }
+      flowPart.historyDeleted = histDel;
+    } catch (eH2) { flowPart.errors.push('history purge: ' + eH2.message.slice(0, 100)); }
     const planeSeeded = 0; // Plane stays EMPTY before migration (states/columns are kept) - demo narrative
     resetJob.phase = 'wiping + re-seeding Jira (VM-side, crash-safe)';
     let jdel = 0, seeded = 0;

@@ -24,7 +24,7 @@ function transitions(g, source, targetName) {
   if (target.length !== 1) return [];
   return g.flows.filter(f => f.sourceRef === source).filter(f => f.targetRef === target[0].id || (f.targetRef.startsWith('appli_') && g.flows.some(a => a.sourceRef === f.targetRef && a.targetRef === target[0].id)));
 }
-function createTools({flowableApi, planeApi, CFG, log, ocrProjectId, stateAlias}) {
+function createTools({flowableApi, planeApi, CFG, log, ocrProjectId, stateAlias, startCase}) {
   const alias = stateAlias || (n => n);
   const queues = new Map();
   async function serial(key, fn) {
@@ -71,6 +71,12 @@ function createTools({flowableApi, planeApi, CFG, log, ocrProjectId, stateAlias}
       const current = typeof item.state === 'object' ? item.state.id : item.state_id || item.state;
       if (String(current) !== String(newId)) return {skipped:'stale event: Plane has a different current state'};
       const instances = await matches(wi.id);
+      if (instances.length === 0 && startCase) {
+        await startCase(item, project, String(newId));
+        const fresh = await matches(wi.id);
+        if (!fresh.length) return {skipped:'case start failed'};
+        instances.push(...fresh);
+      }
       if (instances.length !== 1) return {skipped:'no unique dossier instance', count:instances.length};
       const inst = instances[0]; const v = variables(inst.variables);
       if (String(v.stateId) === String(newId)) return {skipped:'already synchronized'};
