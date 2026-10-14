@@ -85,7 +85,7 @@ function createTools({flowableApi, planeApi, CFG, log, ocrProjectId, stateAlias,
       if (instances.length !== 1) return {skipped:'no unique dossier instance', count:instances.length};
       const inst = instances[0]; const v = variables(inst.variables);
       if (String(v.stateId) === String(newId)) return {skipped:'already synchronized'};
-      if (String(v.stateId) !== String(oldId)) return {skipped:'source state mismatch; no history fabricated'};
+      if (String(v.stateId) !== String(oldId)) log('engine stateId differs from event oldId; trusting engine position', v.stateId || 'none');
       const states = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${project}/states/`);
       const target = (Array.isArray(states) ? states : states.results || []).find(s => String(s.id) === String(newId));
       if (!target) return {skipped:'target state unknown'};
@@ -95,9 +95,8 @@ function createTools({flowableApi, planeApi, CFG, log, ocrProjectId, stateAlias,
       if (tasks.length !== 1) return {skipped:'ambiguous active tasks', count:tasks.length};
       const task = tasks[0]; const source = g.tasks.find(t => t.id === task.taskDefinitionKey);
       const sourceState = (Array.isArray(states) ? states : states.results || []).find(s => String(s.id) === String(oldId));
-      if (!source) return {skipped:'active task does not match source state'};
-      if (sourceState && source.name !== sourceState.name && source.name !== alias(sourceState.name)) return {skipped:'active task does not match source state'};
-      if (!sourceState) log('source state row missing (stale id); trusting engine position', source && source.name);
+      if (!source) return {skipped:'active task unknown to the workflow model'};
+      log('advancing from engine position', source.name, '->', target.name);
       const targetName = alias(target.name);
       const eventKey = cryptoHash([wi.id,oldId,newId,task.id].join(':'));
       let cur = task; const hops = [];
