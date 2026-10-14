@@ -122,25 +122,19 @@ function bfsFlowPath(g, sourceId, targetName) {
   const isTask = id => g.tasks.some(t => t.id === id);
   const bySource = {};
   for (const f of g.flows) (bySource[f.sourceRef] = bySource[f.sourceRef] || []).push(f);
-  const q = [[sourceId, []]]; const seen = new Set([sourceId]);
-  while (q.length) {
+  const q = [[sourceId, []]]; const seen = new Set([sourceId]); let pop = 0;
+  while (q.length && pop++ < 500) {
     const pair = q.shift(); const node = pair[0]; const flows = pair[1];
     for (const f of (bySource[node] || [])) {
       const fl = flows.concat([f.id]);
       let cur = f.targetRef; let guard = 0;
-      while (cur !== tid && guard++ < 8) {
-        if (String(cur).startsWith('appli_')) {
-          const inner = bySource[cur] || [];
-          if (inner.length !== 1) { cur = null; break; }
-          cur = inner[0].targetRef;
-        } else if (!isTask(cur)) {
-          const out = bySource[cur] || [];
-          if (out.length !== 1) { cur = null; break; }
-          cur = out[0].targetRef;
-        } else break;
+      while (cur && cur !== tid && !isTask(cur) && String(cur).startsWith('appli_') && guard++ < 6) {
+        const inner = bySource[cur] || [];
+        cur = inner.length === 1 ? inner[0].targetRef : null;
       }
+      if (!cur) continue;
       if (cur === tid) return fl;
-      if (cur && isTask(cur) && !seen.has(cur)) { seen.add(cur); q.push([cur, fl]); }
+      if (!seen.has(cur)) { seen.add(cur); q.push([cur, fl]); }
     }
   }
   return null;
