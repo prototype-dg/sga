@@ -79,13 +79,9 @@ function html(res, code, text) { try { res.setHeader('cache-control', 'no-store'
 const API_JOURNAL = [];
 function jrec(e) {
   try {
-    let d = e.d || null;
-    if (!d) {
-      const hay = String(e.url || '') + ' ' + (typeof e.req === 'string' ? e.req : JSON.stringify(e.req || ''));
-      const m = hay.match(/work-items\/([0-9a-f-]{36})/i) || hay.match(/"dossierId"\s*:\s*"([0-9a-f-]{36})"/i) || hay.match(/businessKey[":\s]+([0-9a-f-]{36})/i);
-      if (m) d = m[1];
-    }
-    API_JOURNAL.push(Object.assign({ ts: new Date().toISOString(), d: d }, e));
+    const hay = String(e.url || '') + ' ' + (typeof e.req === 'string' ? e.req : JSON.stringify(e.req || ''));
+    const ids = [...new Set((hay.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi) || []).map(x => x.toLowerCase()))].slice(0, 10);
+    API_JOURNAL.push(Object.assign({ ts: new Date().toISOString(), d: e.d || ids[0] || null, ids: ids }, e));
     if (API_JOURNAL.length > 600) API_JOURNAL.splice(0, API_JOURNAL.length - 600);
   } catch (_) {}
 }
@@ -961,8 +957,8 @@ const server = http.createServer(async (req, res) => {
       return html(res, 200, inspectorPage(bootstrap));
     }
     if (method === 'GET' && pathName.startsWith('/inspector/api/journal/')) {
-      const d = pathName.slice('/inspector/api/journal/'.length).replace(/\/$/, '');
-      return json(res, 200, { entries: API_JOURNAL.filter(x => x.d === d).slice(-120) });
+      const d = pathName.slice('/inspector/api/journal/'.length).replace(/\/$/, '').toLowerCase();
+      return json(res, 200, { total: API_JOURNAL.length, entries: API_JOURNAL.filter(x => (x.ids || []).indexOf(d) !== -1 || x.d === d).slice(-120) });
     }
     if (method === 'GET' && pathName === '/inspector/api/model') {
       if (u.searchParams.get('definition')) return send(res, 200, await processTools.model(u.searchParams.get('definition')), 'application/xml; charset=utf-8');
