@@ -565,18 +565,16 @@ function migSnap() {
   return { running: migJob.running, phase: migJob.phase, done: migJob.done, total: migJob.total, errors: migJob.errors.slice(0, 5), result: migJob.result, startedAt: migJob.startedAt, finishedAt: migJob.finishedAt };
 }
 async function ensureOcrProject() {
-  let pid = await ocrProjectId();
-  if (pid) return { pid, created: false };
-  const r = await planeApi('POST', '/api/v1/workspaces/sga/projects/', { name: 'Octroi de Credit', description: 'Octroi de Cr\u00e9dit \u2014 cr\u00e9\u00e9 par la migration live depuis Jira DC', network: 2 });
-  pid = r.id;
-  if (!pid) throw new Error('project create failed');
-  OCR_PID = pid;
-  log('projet OCR cree par la migration: ' + pid);
+  const pid = await ocrProjectId();
+  if (!pid) return { pid: null, created: false, absent: true };
   try {
-    await planeApi('POST', '/api/v1/workspaces/sga/projects/' + pid + '/webhooks/', { url: 'https://sga.andersenlab.com/api/webhook', is_active: true, secret: CFG.webhookSecret });
-    log('webhook enregistre sur le nouveau projet');
-  } catch (eW) { log('webhook warn: ' + eW.message.slice(0, 120)); }
-  return { pid, created: true };
+    const wh = await planeApi('GET', '/api/v1/workspaces/sga/projects/' + pid + '/webhooks/');
+    if (!(wh.results || []).length) {
+      await planeApi('POST', '/api/v1/workspaces/sga/projects/' + pid + '/webhooks/', { url: 'https://sga.andersenlab.com/api/webhook', is_active: true, secret: CFG.webhookSecret });
+      log('webhook enregistre sur le projet OCR');
+    }
+  } catch (eW) { log('webhook ensure warn: ' + eW.message.slice(0, 100)); }
+  return { pid, created: false };
 }
 async function runMigrationJob() {
   migJob.running = true; migJob.phase = 'creation du projet OCR dans Plane'; migJob.errors = [];
@@ -876,8 +874,8 @@ const server = http.createServer(async (req, res) => {
       if (!id) return json(res, 400, { error: 'missing id' });
       const bulk = (id === 'jira-import' || id === 'jira-import-wipe' || id === 'jira-import-phases');
       if (bulk) SUPPRESS_WEBHOOK = true;
-      if (bulk) { try { const prE = await ensureOcrProject(); if (prE.created) log('projet OCR cree (migration step 0): ' + prE.pid); } catch (ePr) { return json(res, 502, { error: 'project create: ' + ePr.message.slice(0, 160) }); } }
-      if (bulk && id !== 'jira-import') { try { await new Promise(r2 => setTimeout(r2, 4000)); await ensureOcrProject(); } catch (eW2) { } }
+      if (bulk) { try { const prE = await ensureOcrProject(); if (prE.absent) log('projet OCR absent - l importeur va le creer (step 0)'); } catch (ePr) { log('project ensure warn: ' + ePr.message.slice(0, 100)); } }
+      if (bulk) { try { await new Promise(r2 => setTimeout(r2, 4000)); OCR_PID = null; const prP = await ensureOcrProject(); if (prP.pid) log('projet OCR pret: ' + prP.pid); } catch (eW2) { } }
       try {
         const out = await agentRun(id, bulk ? 1500000 : undefined);
         if (out && out.exit === 0 && ['workflow-migrate', 'jira-dry', 'jira-import', 'jira-import-wipe', 'jira-import-phases'].indexOf(id) !== -1) MIGRATED = true;
