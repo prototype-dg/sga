@@ -64,7 +64,7 @@ function createTools({flowableApi, planeApi, CFG, log, ocrProjectId, stateAlias}
       const newId = a.new_identifier || (uuid(a.new_value) ? a.new_value : null);
       if (!oldId || !newId || String(oldId) === String(newId)) return {skipped:'state change identifiers missing or unchanged'};
       const project = typeof wi.project === 'object' ? wi.project.id : wi.project_id || wi.project;
-      const expectedProject = CFG.planeCreditProject || (ocrProjectId ? await ocrProjectId() : '');
+      const expectedProject = ocrProjectId ? await ocrProjectId() : CFG.planeCreditProject;
       if (String(project) !== String(expectedProject)) return {skipped:'other project'};
       const item = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${project}/work-items/${wi.id}/`);
       const current = typeof item.state === 'object' ? item.state.id : item.state_id || item.state;
