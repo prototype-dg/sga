@@ -45,6 +45,19 @@ const CFG = {
   agentToken: ENV.AGENT_TOKEN || '',
 };
 
+/* ---------------- dynamic OCR project resolution (project is CREATED by migration) ---------------- */
+let OCR_PID = null;
+async function ocrProjectId() {
+  if (OCR_PID) return OCR_PID;
+  try {
+    const r = await planeApi('GET', '/api/v1/workspaces/sga/projects/');
+    const hit = (r.results || []).find(x => (x.name || '').toLowerCase().indexOf('octroi') !== -1);
+    if (hit) { OCR_PID = hit.id; return OCR_PID; }
+  } catch (e) { }
+  return null;
+}
+function ocrProjectSync() { return OCR_PID || await ocrProjectId() || ''; }
+
 /* ---------------- tiny helpers ---------------- */
 function log(...a) {
   RING.push('[' + new Date().toISOString() + '] ' + Array.from(arguments).map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join(' '));
@@ -244,7 +257,7 @@ async function handleWebhook(bodyBuf, signature) {
   const proj = wi.project_id || (wi.project && (wi.project.id || wi.project)) || null;
   if (!wi.id) { log('webhook skip: work item partiel (data=' + JSON.stringify(Object.keys(body.data || {})) + ')'); return { skipped: 'no work item in payload' }; }
   log('webhook work item', String(wi.name || wi.id), 'projet', String(proj || '?'));
-  if (String(proj) !== String(CFG.planeCreditProject)) { log('webhook skip: autre projet', String(proj)); return { skipped: 'other project' }; }
+  if (String(proj) !== String(await ocrProjectId())) { log('webhook skip: autre projet', String(proj)); return { skipped: 'other project' }; }
   return processTools.serial(String(wi.id), async () => {
     const item = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${proj}/work-items/${wi.id}/`);
     await appendInspectorLink(item, proj);
@@ -267,7 +280,7 @@ async function handleWebhook(bodyBuf, signature) {
 
 /* ---------------- REST ingestion (mobile app / API) ---------------- */
 async function ingestDossier(body) {
-  const projectId = CFG.planeCreditProject;
+  const projectId = await ocrProjectId();
   const client = body.client || {};
   const nom = client.nom || body.client || 'Client anonyme';
   const type = (body.type || body.produit || 'CONSO').toUpperCase();
@@ -435,7 +448,7 @@ setInterval(function(){fetch('/inspector/api/log?t='+Date.now()).then(function(r
 
 async function resetPlaneOnly() {
   const out = { deletedWorkItems: 0, errors: [] };
-  const projects = [CFG.planeCreditProject, CFG.planeRfcProject].filter(Boolean);
+  const projects = [await ocrProjectId(), CFG.planeRfcProject].filter(Boolean);
   for (const pid of projects) {
     try {
       let guard = 0;
@@ -456,11 +469,11 @@ async function resetPlaneOnly() {
 async function planeSeedDemo() {
   const recs = ((DEMO_DATASET && DEMO_DATASET.records) || []).slice(0, 10);
   let n = 0;
-  if (!CFG.planeCreditProject) return n;
+  if (!await ocrProjectId()) return n;
   for (const rec of recs) {
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
-        await planeCreateWorkItem(CFG.planeCreditProject, {
+        await planeCreateWorkItem(await ocrProjectId(), {
           name: `Dossier ${rec.demandeur}`,
           description_html: `<p>Dossier de crédit (seed démo) ${rec.ref} — ${rec.produit}, ${rec.montant} DZD, agence ${rec.agence}.</p>`,
           work_item_type: 'dossier-credit',
@@ -525,7 +538,12 @@ async function runResetJob() {
     const jdel = CFG.jiraPass ? await jiraWipeIssues() : 0;
     resetJob.phase = 're-seeding Jira dataset';
     const seeded = CFG.jiraPass ? await jiraSeedDataset(resetJob) : 0;
-    resetJob.result = { ...planePart, planeSeeded, deletedProcesses: flowPart.deletedProcesses, jiraDeleted: jdel, jiraSeeded: seeded };
+    resetJob.phase = 'removing OCR project (pre-migration: Plane is empty)';
+    try {
+      await planeApi('DELETE', '/api/v1/workspaces/sga/projects/' + await ocrProjectId() + '/');
+      OCR_PID = null;
+    } catch (eP) { resetJob.errors.push('project delete: ' + eP.message.slice(0, 100)); }
+    resetJob.result = { ...planePart, planeSeeded, deletedProcesses: flowPart.deletedProcesses, jiraDeleted: jdel, jiraSeeded: seeded, ocrProject: 'deleted' };
   } catch (e) { resetJob.errors.push('fatal: ' + e.message.slice(0, 200)); }
   SUPPRESS_WEBHOOK = false;
   resetJob.phase = resetJob.errors.length ? 'error' : 'done';
@@ -539,8 +557,26 @@ const migJob = { running: false, startedAt: null, finishedAt: null, phase: 'idle
 function migSnap() {
   return { running: migJob.running, phase: migJob.phase, done: migJob.done, total: migJob.total, errors: migJob.errors.slice(0, 5), result: migJob.result, startedAt: migJob.startedAt, finishedAt: migJob.finishedAt };
 }
+async function ensureOcrProject() {
+  let pid = await ocrProjectId();
+  if (pid) return { pid, created: false };
+  const r = await planeApi('POST', '/api/v1/workspaces/sga/projects/', { name: 'Octroi de Credit', description: 'Octroi de Cr\u00e9dit \u2014 cr\u00e9\u00e9 par la migration live depuis Jira DC', network: 2 });
+  pid = r.id;
+  if (!pid) throw new Error('project create failed');
+  OCR_PID = pid;
+  log('projet OCR cree par la migration: ' + pid);
+  try {
+    await planeApi('POST', '/api/v1/workspaces/sga/projects/' + pid + '/webhooks/', { url: 'https://sga.andersenlab.com/api/webhook', is_active: true, secret: CFG.webhookSecret });
+    log('webhook enregistre sur le nouveau projet');
+  } catch (eW) { log('webhook warn: ' + eW.message.slice(0, 120)); }
+  return { pid, created: true };
+}
 async function runMigrationJob() {
-  migJob.running = true; migJob.phase = 'non-destructive workflow and Jira alignment'; migJob.errors = [];
+  migJob.running = true; migJob.phase = 'creation du projet OCR dans Plane'; migJob.errors = [];
+  SUPPRESS_WEBHOOK = true;
+  try {
+    const pr = await ensureOcrProject();
+    migJob.phase = 'non-destructive workflow and Jira alignment';
   SUPPRESS_WEBHOOK = true;
   try {
     const out = await agentRun('jira-import');
@@ -553,7 +589,7 @@ async function runMigrationJob() {
 async function liveStatus() {
   const st = { middleware: 'ok', plane: 'down', flowable: 'down', jira: 'skipped', workItems: null, jiraIssues: null };
   try {
-    const page = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/work-items/?per_page=1`);
+    const page = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${await ocrProjectId()}/work-items/?per_page=1`);
     st.plane = 'ok'; st.workItems = page.total_results != null ? page.total_results : ((page.results || []).length);
   } catch (e) { st.plane = 'down: ' + e.message.slice(0, 80); }
   try { await flowableApi('GET', '/service/management/engine'); st.flowable = 'ok'; } catch (e) { st.flowable = 'down: ' + e.message.slice(0, 80); }
@@ -776,8 +812,8 @@ const server = http.createServer(async (req, res) => {
       if (dossier || instanceId) {
         bootstrap = {};
         if (dossier && /^[a-f0-9-]{36}$/i.test(dossier)) {
-          const item = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/work-items/${dossier}/`);
-          const sp = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/states/`);
+          const item = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${await ocrProjectId()}/work-items/${dossier}/`);
+          const sp = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${await ocrProjectId()}/states/`);
           const sid = typeof item.state === 'object' ? item.state.id : item.state;
           const state = (Array.isArray(sp) ? sp : sp.results || []).find(s => s.id === sid);
           const instances = await processTools.matches(dossier, true);
@@ -813,8 +849,8 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET' && pathName.startsWith('/inspector/api/dossier/')) {
       const dossier = decodeURIComponent(pathName.split('/').pop());
       if (!/^[a-f0-9-]{36}$/i.test(dossier)) return json(res, 400, {error:'invalid dossier ID'});
-      const item = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/work-items/${dossier}/`);
-      const sp = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${CFG.planeCreditProject}/states/`);
+      const item = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${await ocrProjectId()}/work-items/${dossier}/`);
+      const sp = await planeApi('GET', `/api/v1/workspaces/${CFG.planeWorkspace}/projects/${await ocrProjectId()}/states/`);
       const sid = typeof item.state === 'object' ? item.state.id : item.state;
       const state = (Array.isArray(sp) ? sp : sp.results || []).find(s => s.id === sid);
       const instances = await processTools.matches(dossier, true);
